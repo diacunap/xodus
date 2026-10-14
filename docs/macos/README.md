@@ -110,6 +110,15 @@ tar -xJf dist/WS12WineCX26.3_4.tar.xz -C ~/Games/xodus/engines/r4
 ~/Developer/xodus/scripts/macos/run-nms.sh
 ```
 
+Or, instead of steps 3 and 5: **Play** in `Xodus.app` (Downloads → Installed, or the game's
+detail panel). `crates/xodus-ui/src/launcher.rs` does the same as the script for any installed
+GDK game: exe from `MicrosoftGame.Config` `<ExecutableList>`, decrypt once into `<G>-decrypted`
+(marker `.xodus-decrypted`), APFS clone into `<G>-run`, prefix `~/Games/xodus/prefixes/<Folder>`,
+`xgameruntime.dll` into system32, starts the bundled `xodus-service` if `/tmp/xodus.sock` is dead,
+log in `~/Games/xodus/logs/<Folder>.log`. Engine path: Settings (`~/Library/Application
+Support/Xodus/settings.json`). Stop = `wineserver -k` for that prefix. A prefix made by the script
+can be reused with a symlink, e.g. `prefixes/NoMansSky -> ../prefix-nms` (keeps local saves).
+
 `scripts/macos/run-nms.sh` sets:
 `WINEDLLOVERRIDES="xgameruntime=b;vulkan-1=b"` (use Wine's Vulkan loader, not the game's
 bundled `vulkan-1.dll`), `WINE_VK_MASK_UNSUPPORTED_FEATURES=1`, `XODUS_SOCKET=/tmp/xodus.sock`,

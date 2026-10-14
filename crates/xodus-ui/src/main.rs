@@ -5,6 +5,7 @@
 
 mod catalog;
 mod downloads;
+mod launcher;
 mod library;
 
 use std::sync::Arc;
@@ -30,6 +31,7 @@ struct Ctx {
     client: reqwest::Client,
     tokens: TokenManager,
     downloads: Arc<downloads::Downloads>,
+    launcher: Arc<launcher::Launcher>,
 }
 
 fn main() {
@@ -40,15 +42,17 @@ fn main() {
     let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
 
     xodus::secrets::init_secrets().expect("Unable to initialize credentials");
+    // xodus-cli and xodus-service ship next to xodus-ui (Contents/MacOS in the bundle).
+    let exe = std::env::current_exe().expect("current exe");
+    let app_dir = exe.parent().expect("exe dir").to_path_buf();
     let ctx = Arc::new(Ctx {
         client: reqwest::ClientBuilder::new()
             .user_agent(format!("xodus-ui/{}", env!("CARGO_PKG_VERSION")))
             .build()
             .unwrap(),
         tokens: TokenManager::with_keychain_and_memory(),
-        downloads: downloads::Downloads::load(
-            std::env::current_exe().expect("current exe").with_file_name("xodus-cli"),
-        ),
+        downloads: downloads::Downloads::load(app_dir.join("xodus-cli")),
+        launcher: launcher::Launcher::load(app_dir),
     });
     rt.block_on(xodus::tokens::device::ensure_device_credentials(&ctx.client, &ctx.tokens));
 
@@ -138,8 +142,12 @@ async fn handle_cmd(ctx: &Ctx, cmd: &str, arg: &str) -> Result<Value, catalog::E
         "download_cancel" => ctx.downloads.cancel(arg).map(|_| Value::Null),
         "download_remove" => ctx.downloads.remove(arg).map(|_| Value::Null),
         "reveal" => ctx.downloads.reveal(arg).await.map(|_| Value::Null),
-        // Hook for the launcher being designed separately.
-        "launch" => Err("launching games is not implemented yet".into()),
+        "launch" => ctx.launcher.launch(&ctx.client, arg).await.map(|_| Value::Null),
+        "launch_status" => Ok(ctx.launcher.status()),
+        "launch_stop" => ctx.launcher.stop().await.map(|_| Value::Null),
+        "open_log" => ctx.launcher.open_log().await.map(|_| Value::Null),
+        "get_settings" => Ok(ctx.launcher.settings()),
+        "set_settings" => ctx.launcher.set_settings(arg),
         other => Err(format!("unknown command {other}").into()),
     }
 }

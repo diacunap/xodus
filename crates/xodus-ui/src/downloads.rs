@@ -19,7 +19,7 @@ use crate::catalog::{self, Error};
 /// stderr/stdout lines kept to explain a failure.
 const TAIL: usize = 20;
 /// Written by `streaming` only once the whole download succeeded.
-const DONE_MARKER: &str = ".xodus-streaming.msixvc";
+pub const DONE_MARKER: &str = ".xodus-streaming.msixvc";
 const TMP_MARKER: &str = ".xodus-streaming-tmp.msixvc";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -384,7 +384,7 @@ impl Downloads {
             .flatten()
             .flatten()
             .map(|e| e.path())
-            .filter(|p| !busy.contains(p))
+            .filter(|p| !busy.contains(p) && !crate::launcher::is_derived_dir(p))
             .filter_map(|p| {
                 let mtime = std::fs::metadata(p.join(DONE_MARKER)).ok()?.modified().ok()?;
                 Some((p, mtime))
@@ -498,13 +498,18 @@ fn completed(dest: &Path, started: SystemTime) -> bool {
     fresh && !dest.join(TMP_MARKER).exists()
 }
 
-/// `<StoreId>` from the package's MicrosoftGame.Config (tag case-insensitive).
-fn store_id(dir: &Path) -> Option<String> {
-    let config = std::fs::read_dir(dir)
+/// The package's MicrosoftGame.Config (file name case-insensitive).
+pub fn find_config(dir: &Path) -> Option<PathBuf> {
+    std::fs::read_dir(dir)
         .ok()?
         .flatten()
-        .find(|e| e.file_name().to_string_lossy().eq_ignore_ascii_case("MicrosoftGame.Config"))?;
-    let text = std::fs::read_to_string(config.path()).ok()?;
+        .find(|e| e.file_name().to_string_lossy().eq_ignore_ascii_case("MicrosoftGame.Config"))
+        .map(|e| e.path())
+}
+
+/// `<StoreId>` from the package's MicrosoftGame.Config (tag case-insensitive).
+pub fn store_id(dir: &Path) -> Option<String> {
+    let text = std::fs::read_to_string(find_config(dir)?).ok()?;
     let lower = text.to_ascii_lowercase();
     let start = lower.find("<storeid>")? + "<storeid>".len();
     let end = start + lower[start..].find('<')?;
@@ -529,7 +534,7 @@ fn dir_size(dir: &Path) -> u64 {
     total
 }
 
-fn now() -> u64 {
+pub fn now() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
 }
 

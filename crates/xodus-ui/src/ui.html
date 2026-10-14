@@ -12,25 +12,26 @@
   [hidden] { display: none !important; }
   body { margin: 0; background: var(--bg); color: var(--text);
          font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-         display: grid; grid-template-columns: 200px 1fr; height: 100vh; overflow: hidden; }
+         display: grid; grid-template-columns: 200px 1fr; grid-template-rows: minmax(0, 1fr);
+         height: 100vh; overflow: hidden; }
   nav { background: var(--panel); border-right: 1px solid var(--line); padding: 18px 12px;
-        display: flex; flex-direction: column; gap: 4px; }
+        display: flex; flex-direction: column; gap: 4px; min-height: 0; overflow-y: auto; }
   nav h1 { font-size: 18px; margin: 0 8px 18px; letter-spacing: .5px; }
   nav h1 span { color: var(--accent); }
   nav button { all: unset; cursor: pointer; padding: 9px 10px; border-radius: 7px; color: var(--muted); }
   nav button:hover { background: var(--card); color: var(--text); }
   nav button.active { background: var(--card); color: var(--text); box-shadow: inset 3px 0 var(--accent); }
   nav .user { margin-top: auto; font-size: 12px; color: var(--muted); padding: 0 8px; word-break: break-all; }
-  main { display: flex; flex-direction: column; min-width: 0; }
+  main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
   header { display: flex; gap: 12px; align-items: center; padding: 14px 20px; border-bottom: 1px solid var(--line); }
   header input[type=search] { flex: 1; background: var(--card); border: 1px solid var(--line); color: var(--text);
                               padding: 9px 12px; border-radius: 8px; font-size: 14px; outline: none; }
   header input[type=search]:focus { border-color: var(--accent); }
   header label { color: var(--muted); font-size: 13px; white-space: nowrap; user-select: none; }
   .count { color: var(--muted); font-size: 13px; white-space: nowrap; }
-  .content { flex: 1; display: grid; grid-template-columns: 1fr; overflow: hidden; }
+  .content { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr); overflow: hidden; }
   .content.with-detail { grid-template-columns: 1fr 340px; }
-  #grid { overflow-y: auto; padding: 20px; display: grid; gap: 16px; align-content: start;
+  #grid { min-height: 0; overflow-y: auto; padding: 20px; display: grid; gap: 16px; align-content: start;
           grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
   .card { background: var(--card); border-radius: 10px; overflow: hidden; cursor: pointer;
           border: 1px solid transparent; transition: transform .12s, border-color .12s; }
@@ -44,7 +45,7 @@
   .chip.ok { background: #1d3a25; color: #7fe39a; }
   .chip.warn { background: #3d3119; color: #f0c56e; }
   .chip.bad { background: #3b2222; color: #f08f8f; }
-  aside { border-left: 1px solid var(--line); background: var(--panel); overflow-y: auto; padding: 20px; }
+  aside { border-left: 1px solid var(--line); background: var(--panel); min-height: 0; overflow-y: auto; padding: 20px; }
   aside img { width: 100%; border-radius: 10px; }
   aside h2 { margin: 14px 0 2px; font-size: 18px; }
   aside .pub { color: var(--muted); margin-bottom: 14px; }
@@ -71,7 +72,7 @@
   .link { color: var(--muted); font-size: 12px; cursor: pointer; text-decoration: underline; }
   .link:hover { color: var(--text); }
   .note { color: var(--muted); font-size: 12px; margin: 6px 0 10px; }
-  #dl { overflow-y: auto; padding: 20px; }
+  #dl { min-height: 0; overflow-y: auto; padding: 20px; }
   #dl h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin: 6px 0 10px; }
   #dl section { margin-bottom: 26px; }
   .row { display: grid; grid-template-columns: 54px 1fr auto; gap: 14px; align-items: center; background: var(--card);
@@ -84,7 +85,21 @@
   .bar { height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; margin: 7px 0 4px; }
   .bar i { display: block; height: 100%; background: var(--accent); transition: width .4s; }
   .nums { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
-  .msg { color: #f08f8f; font-size: 12px; margin-top: 6px; }
+  .msg { color: #f08f8f; font-size: 12px; margin-top: 6px; white-space: pre-wrap; word-break: break-word; }
+  .opts { display: flex; gap: 10px; color: var(--muted); font-size: 12px; user-select: none; }
+  .opts label { display: flex; gap: 4px; align-items: center; cursor: pointer; }
+  .play { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+  aside .play { align-items: stretch; margin-bottom: 8px; }
+  .play .btns { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  .run { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .run.ok { color: #7fe39a; }
+  aside .play .btns { flex-direction: column; }
+  aside .play .btn { text-align: center; }
+  nav .settings { margin-top: 8px; font-size: 13px; }
+  .field { display: flex; gap: 8px; margin: 8px 0; max-width: 720px; }
+  .field input { flex: 1; background: var(--card); border: 1px solid var(--line); color: var(--text);
+                 padding: 8px 10px; border-radius: 8px; font: 13px ui-monospace, Menlo, monospace; outline: none; }
+  .field input:focus { border-color: var(--accent); }
 </style>
 </head>
 <body>
@@ -95,6 +110,7 @@
   <button data-view="store">Search store</button>
   <button data-view="downloads">Downloads<span class="badge" id="badge" hidden></span></button>
   <div class="user" id="user"></div>
+  <button data-view="settings" class="settings">⚙ Settings</button>
 </nav>
 <main>
   <header>
@@ -130,7 +146,8 @@ const STATUS = {
 const ACQ = { purchased: "Purchased", gamepass: "Game Pass", other: "Other" };
 
 const state = { view: "library", cache: {}, items: [], selected: null, cli: "xodus-cli", searchSeq: 0,
-                dl: { jobs: [], installed: [] }, dlError: null, actionError: null };
+                dl: { jobs: [], installed: [] }, dlError: null, actionError: null,
+                launch: null, opts: { hud: false, debug: false }, settings: null, settingsMsg: null };
 
 function chipsFor(g) {
   const out = [];
@@ -209,8 +226,7 @@ function actionHtml(g) {
     return `<button class="btn wide" disabled>Queued</button>
             <button class="btn ghost wide" data-act="cancel" data-id="${esc(g.product_id)}">Cancel</button>${msg}`;
   if (inst)
-    return `<button class="btn wide" disabled>Installed</button>
-            <button class="btn ghost wide" data-act="reveal" data-path="${esc(inst.path)}">Show in Finder</button>${msg}`;
+    return playHtml(inst, `<button class="btn ghost" data-act="reveal" data-path="${esc(inst.path)}">Show in Finder</button>`) + msg;
   if (j && RESTARTABLE.includes(j.state))
     return `<button class="btn wide" data-act="start" data-id="${esc(g.product_id)}">Restart download</button>
             <div class="note">Last attempt: ${esc(JOB[j.state])}. ${NO_RESUME}</div>${msg}`;
@@ -241,9 +257,49 @@ function installedRow(i) {
   return `<div class="row">
     <div class="thumb" style="background-image:url('${esc(i.image || "")}')"></div>
     <div><div class="t">${esc(i.title)}</div><div class="sub">${esc(i.path)}</div><div class="nums">${gb(i.size_bytes)} on disk</div></div>
-    <div class="acts">
-      <button class="btn" data-act="launch" data-id="${esc(i.product_id || "")}" disabled title="Launching is not available yet">Play (coming soon)</button>
-      <button class="btn ghost" data-act="reveal" data-path="${esc(i.path)}">Show in Finder</button></div></div>`;
+    <div class="acts">${playHtml(i, `<button class="btn ghost" data-act="reveal" data-path="${esc(i.path)}">Show in Finder</button>`)}</div></div>`;
+}
+
+// ---- Play ----
+const launchActive = () => ["preparing", "running"].includes(state.launch?.state);
+const clock = s => { s = Math.max(0, s); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = String(s % 60).padStart(2, "0");
+                     return h ? `${h}:${String(m).padStart(2, "0")}:${x}` : `${m}:${x}`; };
+
+// Play controls for an installed game; `extra` = more buttons next to Play.
+function playHtml(inst, extra = "") {
+  const r = state.launch, mine = r && r.path === inst.path;
+  if (mine && r.state === "preparing")
+    return `<div class="play"><div class="btns"><button class="btn" disabled><span class="spin"></span> Preparing</button>${extra}</div>
+            <div class="run">${esc(r.status)}</div></div>`;
+  if (mine && r.state === "running")
+    return `<div class="play"><div class="btns"><button class="btn" disabled>Running</button>
+            <button class="btn ghost" data-act="stop">Stop</button>${extra}</div>
+            <div class="run ok">Running for ${clock(Math.floor(Date.now() / 1000) - (r.started_at || 0))}</div></div>`;
+  let last = "";
+  if (mine && r.state === "exited")
+    last = `<div class="run">${r.stopped ? "Stopped" : "Exited"}${r.exit_code != null ? ` (code ${r.exit_code})` : ""} · <span class="link" data-act="log">Open log</span></div>`;
+  if (mine && r.state === "failed")
+    last = `<div class="msg">${esc(r.error)}</div><span class="link" data-act="log">Open log</span>`;
+  const busy = launchActive() ? `disabled title="Another game is running"` : "";
+  return `<div class="play"><div class="btns"><button class="btn" data-act="launch" data-path="${esc(inst.path)}" ${busy}>Play</button>${extra}</div>
+    <div class="opts"><label><input type="checkbox" data-opt="hud" ${state.opts.hud ? "checked" : ""}> Performance HUD</label>
+      <label><input type="checkbox" data-opt="debug" ${state.opts.debug ? "checked" : ""}> Debug log</label></div>${last}</div>`;
+}
+document.addEventListener("change", e => { const o = e.target.dataset?.opt; if (o) state.opts[o] = e.target.checked; });
+
+// ---- Settings ----
+function renderSettings() {
+  const s = state.settings;
+  $("#count").textContent = "";
+  $("#dl").innerHTML = `<section><h3>Wine engine</h3>
+      <div class="note">Folder of the wine-cx-sikarugir engine (the one that contains bin/wine).
+        Default: ~/Games/xodus/engines/r4/wswine.bundle</div>
+      <div class="field"><input id="engine" value="${esc(s?.engine || "")}" spellcheck="false" placeholder="${s ? "" : "Loading…"}">
+        <button class="btn" data-act="save_settings">Save</button></div>
+      ${s ? (s.engine_ok ? `<div class="run ok">bin/wine found.</div>` : `<div class="msg">bin/wine not found in this folder.</div>`) : ""}
+      ${state.settingsMsg ? `<div class="note">${esc(state.settingsMsg)}</div>` : ""}</section>
+    <section><h3>Folders</h3><div class="note">Games: ~/Games/xodus · Wine prefixes: ~/Games/xodus/prefixes ·
+      Logs: ~/Games/xodus/logs · Settings: ~/Library/Application Support/Xodus/settings.json</div></section>`;
 }
 
 const RANK = { downloading: 0, queued: 1 };
@@ -260,8 +316,9 @@ function renderDownloads() {
 }
 
 async function refreshDownloads() {
-  try { state.dl = await rpc("downloads"); state.dlError = null; }
-  catch (e) { state.dlError = e.message; }
+  const [dl, launch] = await Promise.allSettled([rpc("downloads"), rpc("launch_status")]);
+  if (dl.status === "fulfilled") { state.dl = dl.value; state.dlError = null; } else state.dlError = dl.reason.message;
+  if (launch.status === "fulfilled") state.launch = launch.value;
   const n = activeCount();
   $("#badge").hidden = !n; $("#badge").textContent = n;
   if (state.view === "downloads") renderDownloads();
@@ -280,23 +337,36 @@ async function act(el) {
     } else if (act === "cancel") await rpc("download_cancel", id);
     else if (act === "remove") await rpc("download_remove", id);
     else if (act === "reveal") await rpc("reveal", path);
-    else if (act === "launch") await rpc("launch", id);
+    else if (act === "launch") await rpc("launch", JSON.stringify({ target: path, ...state.opts }));
+    else if (act === "stop") await rpc("launch_stop");
+    else if (act === "log") await rpc("open_log");
+    else if (act === "save_settings") {
+      state.settings = await rpc("set_settings", JSON.stringify({ engine: $("#engine").value.trim() }));
+      state.settingsMsg = "Saved."; renderSettings(); return;
+    }
   } catch (e) {
+    if (state.view === "settings") { state.settingsMsg = e.message; renderSettings(); return; }
     if (state.view === "downloads") state.dlError = e.message; else state.actionError = e.message;
   }
   await refreshDownloads();
 }
 document.addEventListener("click", e => { const b = e.target.closest("[data-act]"); if (b && !b.disabled) act(b); });
-setInterval(() => { if (state.view === "downloads" || activeCount()) refreshDownloads(); }, 1000);
+setInterval(() => { if (state.view === "downloads" || activeCount() || launchActive()) refreshDownloads(); }, 1000);
 
 async function load(view) {
   state.view = view; state.selected = null; state.items = []; state.actionError = null;
   $("#detail").hidden = true; $("#content").classList.remove("with-detail");
   document.querySelectorAll("nav button").forEach(b => b.classList.toggle("active", b.dataset.view === view));
-  const dl = view === "downloads";
-  $("#dl").hidden = !dl; $("#grid").hidden = dl;
-  document.querySelectorAll("header > *:not(.count)").forEach(el => el.hidden = dl);
-  if (dl) { state.dlError = null; renderDownloads(); refreshDownloads(); return; }
+  const panel = view === "downloads" || view === "settings";
+  $("#dl").hidden = !panel; $("#grid").hidden = panel;
+  document.querySelectorAll("header > *:not(.count)").forEach(el => el.hidden = panel);
+  if (view === "downloads") { state.dlError = null; renderDownloads(); refreshDownloads(); return; }
+  if (view === "settings") {
+    state.settingsMsg = null; renderSettings();
+    rpc("get_settings").then(s => { state.settings = s; if (state.view === "settings") renderSettings(); })
+                       .catch(e => { state.settingsMsg = e.message; if (state.view === "settings") renderSettings(); });
+    return;
+  }
   $("#q").value = ""; $("#q").placeholder = view === "store" ? "Search the Microsoft Store…" : "Filter…";
   if (view === "store") { $("#grid").innerHTML = `<div class="empty">Type to search.</div>`; render(); return; }
   if (state.cache[view]) { state.items = state.cache[view]; render(); return; }
