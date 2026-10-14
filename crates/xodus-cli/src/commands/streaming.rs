@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::path::Path;
 use std::process::ExitCode;
+use std::time::{Duration, Instant};
 use std::vec;
 
 use fs2::available_space;
@@ -11,6 +12,7 @@ use msixvc::xvd::{SegmentFile, XvdFile};
 use tokio::fs::{File, OpenOptions};
 use tokio::io::AsyncRead;
 use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::task::JoinHandle;
 use uuid::Uuid;
 use xodus::tokens::TokenManager;
 
@@ -56,7 +58,7 @@ pub async fn run(
                 return ExitCode::FAILURE;
             }
         };
-        run_cli_reader(
+        let progress = run_cli_reader(
             client,
             tokens,
             destination,
@@ -70,6 +72,7 @@ pub async fn run(
             rx,
         )
         .await;
+        finish_progress(tx, progress).await;
     } else {
         let vurl = if source.starts_with("http://") || source.starts_with("https://") {
             source
@@ -132,7 +135,7 @@ pub async fn run(
         .expect("ok");
         let l = http_file.len();
 
-        run_cli_reader(
+        let progress = run_cli_reader(
             client,
             tokens,
             destination,
@@ -146,6 +149,7 @@ pub async fn run(
             rx,
         )
         .await;
+        finish_progress(tx, progress).await;
     }
 
     ExitCode::SUCCESS
@@ -163,11 +167,15 @@ async fn run_cli_reader<Reader>(
     url: &str,
     tx: &Sender<ProgressEvent>,
     mut rx: Receiver<ProgressEvent>,
-) -> ()
+) -> JoinHandle<()>
 where
     Reader: AsyncRead + Unpin,
 {
-    tokio::spawn(async move {
+    let progress = tokio::spawn(async move {
+        if json_progress() {
+            report_json_progress(l, rx).await;
+            return;
+        }
         let multi_progress = MultiProgress::new();
         let total_progess = multi_progress.add(ProgressBar::new(l).with_style(
             ProgressStyle::with_template("{msg:30!} {bytes:>12}/{total_bytes:>12} {bytes_per_sec:>12} [{bar:40.cyan/blue}] {percent:>3}%").unwrap()
@@ -222,7 +230,50 @@ where
         url,
         tx,
     )
-    .await
+    .await;
+    progress
+}
+
+/// `XODUS_PROGRESS_JSON` swaps the indicatif bars for JSON lines on stdout
+/// (`{"done":..,"total":..,"status":..}`) so a frontend can track the download.
+fn json_progress() -> bool {
+    std::env::var_os("XODUS_PROGRESS_JSON").is_some()
+}
+
+async fn report_json_progress(mut total: u64, mut rx: Receiver<ProgressEvent>) {
+    const EVERY: Duration = Duration::from_millis(250);
+    let mut done = 0u64;
+    let mut status = "Initializing".to_owned();
+    let mut last: Option<Instant> = None;
+    let emit = |done: u64, total: u64, status: &str| {
+        println!("{}", serde_json::json!({ "done": done, "total": total, "status": status }));
+    };
+
+    while let Some(event) = rx.recv().await {
+        match event {
+            ProgressEvent::Advanced { delta, .. } => done += delta,
+            ProgressEvent::UpdateRemaining { name, total: remaining } => {
+                status = name;
+                total = done + remaining;
+            }
+            ProgressEvent::UpdateStatus { name } => status = name,
+            ProgressEvent::Started { .. } | ProgressEvent::Finished { .. } => continue,
+        }
+        if last.is_none_or(|t| t.elapsed() >= EVERY) {
+            emit(done, total, &status);
+            last = Some(Instant::now());
+        }
+    }
+    emit(done, total, &status);
+}
+
+/// In JSON mode, close the channel and wait for the final progress line before
+/// the runtime shuts down. Default mode keeps the old detached behaviour.
+async fn finish_progress(tx: Sender<ProgressEvent>, progress: JoinHandle<()>) {
+    if json_progress() {
+        drop(tx);
+        tokio::time::timeout(Duration::from_secs(2), progress).await.ok();
+    }
 }
 
 async fn run_reader<Reader>(
