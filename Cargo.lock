@@ -4683,6 +4683,7 @@ dependencies = [
  "rustls-platform-verifier",
  "serde",
  "serde_json",
+ "serde_urlencoded",
  "sync_wrapper 1.0.2",
  "tokio",
  "tokio-rustls 0.26.4",
@@ -7225,6 +7226,23 @@ dependencies = [
  "tokio-util",
  "tracing",
  "tracing-subscriber",
+ "xodus",
+]
+
+[[package]]
+name = "xodus-ui"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "futures-util",
+ "reqwest 0.13.4",
+ "serde",
+ "serde_json",
+ "tao",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "wry",
  "xodus",
 ]
 
