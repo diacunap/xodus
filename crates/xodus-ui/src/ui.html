@@ -28,11 +28,15 @@
                               padding: 9px 12px; border-radius: 8px; font-size: 14px; outline: none; }
   header input[type=search]:focus { border-color: var(--accent); }
   header label { color: var(--muted); font-size: 13px; white-space: nowrap; user-select: none; }
+  header select { background: var(--card); color: var(--text); border: 1px solid var(--line); border-radius: 8px;
+                  padding: 8px 10px; font-size: 13px; outline: none; }
   .count { color: var(--muted); font-size: 13px; white-space: nowrap; }
   .content { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr); overflow: hidden; }
   .content.with-detail { grid-template-columns: 1fr 340px; }
   #grid { min-height: 0; overflow-y: auto; padding: 20px; display: grid; gap: 16px; align-content: start;
-          grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+          grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+          /* fixed-height scroll container: keep rows at content size instead of squashing them */
+          grid-auto-rows: max-content; }
   .card { background: var(--card); border-radius: 10px; overflow: hidden; cursor: pointer;
           border: 1px solid transparent; transition: transform .12s, border-color .12s; }
   .card:hover { transform: translateY(-2px); border-color: var(--line); }
@@ -106,6 +110,7 @@
 <nav>
   <h1>X<span>odus</span></h1>
   <button data-view="library" class="active">My library</button>
+  <button data-view="installed">Installed</button>
   <button data-view="gamepass">Game Pass PC</button>
   <button data-view="store">Search store</button>
   <button data-view="downloads">Downloads<span class="badge" id="badge" hidden></span></button>
@@ -115,6 +120,9 @@
 <main>
   <header>
     <input type="search" id="q" placeholder="Filter…" autofocus>
+    <select id="instFilter" title="Installed filter">
+      <option value="all">All games</option><option value="installed">Installed</option><option value="not">Not installed</option>
+    </select>
     <label><input type="checkbox" id="onlyOk"> Supported only</label>
     <span class="count" id="count"></span>
   </header>
@@ -151,6 +159,7 @@ const state = { view: "library", cache: {}, items: [], selected: null, cli: "xod
 
 function chipsFor(g) {
   const out = [];
+  if (installedFor(g.product_id)) out.push(`<span class="chip ok">Installed</span>`);
   if (g.acquisition) out.push(`<span class="chip">${esc(ACQ[g.acquisition] || g.acquisition)}</span>`);
   if (g.pc) { const [cls, label] = STATUS[g.pc.xodus]; out.push(`<span class="chip ${cls}">${label}</span>`); }
   else out.push(`<span class="chip bad">No PC</span>`);
@@ -163,6 +172,9 @@ function render() {
   let list = state.items;
   if (state.view !== "store" && q) list = list.filter(g => (g.title + " " + (g.publisher || "")).toLowerCase().includes(q));
   if (onlyOk) list = list.filter(g => g.pc?.xodus === "supported");
+  const inst = $("#instFilter").value;
+  if (state.view === "library" && inst !== "all")
+    list = list.filter(g => !!installedFor(g.product_id) === (inst === "installed"));
   $("#count").textContent = state.items.length ? `${list.length} games` : "";
   if (!list.length) { $("#grid").innerHTML = `<div class="empty">Nothing here.</div>`; return; }
   $("#grid").innerHTML = list.map(g => `
@@ -302,17 +314,25 @@ function renderSettings() {
       Logs: ~/Games/xodus/logs · Settings: ~/Library/Application Support/Xodus/settings.json</div></section>`;
 }
 
+function renderInstalled() {
+  $("#count").textContent = state.dl.installed.length ? `${state.dl.installed.length} installed` : "";
+  $("#dl").innerHTML = `
+    ${state.dlError ? `<div class="msg">${esc(state.dlError)}</div>` : ""}
+    <section><h3>Installed</h3>${state.dl.installed.length ? state.dl.installed.map(installedRow).join("")
+      : `<div class="note">No games in ~/Games/xodus yet. Download one from My library.</div>`}</section>`;
+}
+
 const RANK = { downloading: 0, queued: 1 };
 function renderDownloads() {
   const jobs = [...state.dl.jobs].sort((a, b) => (RANK[a.state] ?? 2) - (RANK[b.state] ?? 2)
                                               || (b.finished_at || 0) - (a.finished_at || 0));
   $("#count").textContent = "";
+  const active = jobs.filter(j => RANK[j.state] != null), past = jobs.filter(j => RANK[j.state] == null);
   $("#dl").innerHTML = `
     ${state.dlError ? `<div class="msg">${esc(state.dlError)}</div>` : ""}
-    <section><h3>Installed</h3>${state.dl.installed.length ? state.dl.installed.map(installedRow).join("")
-      : `<div class="note">No games in ~/Games/xodus yet.</div>`}</section>
-    <section><h3>Downloads</h3>${jobs.length ? jobs.map(jobRow).join("")
-      : `<div class="note">No downloads. Pick a supported game and press Download.</div>`}</section>`;
+    <section><h3>In progress</h3>${active.length ? active.map(jobRow).join("")
+      : `<div class="note">Nothing downloading. Pick a supported game in My library and press Download.</div>`}</section>
+    ${past.length ? `<section><h3>History</h3>${past.map(jobRow).join("")}</section>` : ""}`;
 }
 
 async function refreshDownloads() {
@@ -322,6 +342,8 @@ async function refreshDownloads() {
   const n = activeCount();
   $("#badge").hidden = !n; $("#badge").textContent = n;
   if (state.view === "downloads") renderDownloads();
+  if (state.view === "installed") renderInstalled();
+  if (state.view === "library" && state.items.length) render();   /* Installed chips + filter */
   if (state.selected && $("#action")) $("#action").innerHTML = actionHtml(state.selected);
 }
 
@@ -346,21 +368,23 @@ async function act(el) {
     }
   } catch (e) {
     if (state.view === "settings") { state.settingsMsg = e.message; renderSettings(); return; }
-    if (state.view === "downloads") state.dlError = e.message; else state.actionError = e.message;
+    if (state.view === "downloads" || state.view === "installed") state.dlError = e.message; else state.actionError = e.message;
   }
   await refreshDownloads();
 }
 document.addEventListener("click", e => { const b = e.target.closest("[data-act]"); if (b && !b.disabled) act(b); });
-setInterval(() => { if (state.view === "downloads" || activeCount() || launchActive()) refreshDownloads(); }, 1000);
+setInterval(() => { if (state.view === "downloads" || state.view === "installed" || activeCount() || launchActive()) refreshDownloads(); }, 1000);
 
 async function load(view) {
   state.view = view; state.selected = null; state.items = []; state.actionError = null;
   $("#detail").hidden = true; $("#content").classList.remove("with-detail");
   document.querySelectorAll("nav button").forEach(b => b.classList.toggle("active", b.dataset.view === view));
-  const panel = view === "downloads" || view === "settings";
+  const panel = view === "downloads" || view === "installed" || view === "settings";
   $("#dl").hidden = !panel; $("#grid").hidden = panel;
   document.querySelectorAll("header > *:not(.count)").forEach(el => el.hidden = panel);
   if (view === "downloads") { state.dlError = null; renderDownloads(); refreshDownloads(); return; }
+  if (view === "installed") { state.dlError = null; renderInstalled(); refreshDownloads(); return; }
+  $("#instFilter").hidden = view !== "library";
   if (view === "settings") {
     state.settingsMsg = null; renderSettings();
     rpc("get_settings").then(s => { state.settings = s; if (state.view === "settings") renderSettings(); })
@@ -396,6 +420,7 @@ $("#q").addEventListener("input", () => {
   }, 300);
 });
 $("#onlyOk").addEventListener("change", render);
+$("#instFilter").addEventListener("change", render);
 $("#grid").addEventListener("click", e => {
   const card = e.target.closest(".card"); if (!card) return;
   const g = state.items.find(x => x.product_id === card.dataset.id); if (g) showDetail(g);
