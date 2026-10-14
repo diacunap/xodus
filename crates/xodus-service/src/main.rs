@@ -39,7 +39,7 @@ async fn main() {
     }
 
     xodus::secrets::init_secrets().expect("Failed to init keychain");
-    let tokens = Arc::new(TokenManager::with_keychain_and_memory());
+    let tokens = Arc::new(TokenManager::with_default_storage());
     xodus::tokens::device::ensure_device_credentials(&reqwest::Client::new(), &tokens).await;
     let xodus::models::secrets::Token::Legacy(device_token) =
         tokens.get_device_sts_token().unwrap()

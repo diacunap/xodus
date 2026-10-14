@@ -50,7 +50,7 @@ fn main() {
             .user_agent(format!("xodus-ui/{}", env!("CARGO_PKG_VERSION")))
             .build()
             .unwrap(),
-        tokens: TokenManager::with_keychain_and_memory(),
+        tokens: TokenManager::with_default_storage(),
         downloads: downloads::Downloads::load(app_dir.join("xodus-cli")),
         launcher: launcher::Launcher::load(app_dir),
     });
