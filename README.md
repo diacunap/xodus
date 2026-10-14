@@ -1,122 +1,82 @@
 <p align="center"><img width="128" src="assets/Icon/Icon.ico" /></p>
-<h1 align="center">Xodus</h1>
-<p align="center">The great gaming migration to Linux</p>
-<p align="center">
-    <a href="https://discord.gg/ZG774FK4tq">
-        <img src="https://img.shields.io/discord/1123890623586504714?logo=discord&style=for-the-badge&color=red&label=Game+Launchers+Reverse+Engineering" alt="Discord" />
-    </a>
-</p>
+<h1 align="center">Xodus for macOS</h1>
+<p align="center">Play your Xbox PC / Microsoft Store games on Apple Silicon Macs</p>
 
 > [!CAUTION]
-> This is an unofficial project - use at your own risk. It is not affiliated with, endorsed by, or sponsored by Microsoft or XBOX; all trademarks, product names, and company names or logos mentioned herein are the property of their respective owners.
+> Unofficial and experimental — use at your own risk. Not affiliated with, endorsed by, or
+> sponsored by Microsoft, Xbox or Apple. You need a legitimate license for every game on the
+> Microsoft account you sign in with; decryption uses the content key from your own license.
 
-## Current state of the project
+This is a macOS-focused fork of [xodus-gaming/xodus](https://github.com/xodus-gaming/xodus)
+(which targets Linux). It adds a native Mac app to browse and download the games tied to your
+account, and documents how to run them through a self-built CrossOver/Wine engine
+(Rosetta 2 + MoltenVK/Metal).
 
-The project can now login, download packages and obtain licenses for games.
+## Status
 
-These parts are still quite scattered around.
+| | |
+|---|---|
+| Sign in with your Microsoft account | ✅ |
+| Browse your library (owned games) and the PC Game Pass catalog | ✅ `Xodus.app` |
+| Search the Microsoft Store, see which games Xodus can handle (MSIXVC) | ✅ |
+| Download games (queue, progress, ETA) | ✅ |
+| Decrypt executables for Wine | ✅ (local hack, see docs) |
+| **No Man's Sky** boots, renders (Vulkan → MoltenVK → Metal) and reaches the title screen | ✅ on M4 / macOS 27 |
+| Xbox Live sign-in inside games (`XUser`) | 🚧 blocked on Wine `windows.web` JSON parsing |
+| One-click **Play** from the app | 🚧 after sign-in works |
+| MSIXVC2 packages | ❌ upstream [#53](https://github.com/xodus-gaming/xodus/issues/53) |
 
-- [x] Device login
-- [x] User login
-- [x] XBOX authorization
-- [x] MSIXVC download
-- [x] On-demand .exe decryption [#50](https://github.com/xodus-gaming/xodus/issues/50)
-- [ ] MSIXVC2 support [#53](https://github.com/xodus-gaming/xodus/issues/53)
+Full log of what was done, every blocker and its fix: **[docs/macos/README.md](docs/macos/README.md)**.
 
-## FAQ
+## Requirements
 
-**Q: What is Xodus**  
-Xodus aims to bring XBOX PC games to Linux and possibly Mac devices.
+- Apple Silicon Mac, macOS 14+ (developed on macOS 27 / M4), Rosetta 2
+- Homebrew: `brew install rust protobuf`
+- For running games: a Wine engine built from
+  [wine-cx-sikarugir](https://github.com/diacunap/wine-cx-sikarugir) (rev 4+) — see the docs
+- Disk space for the games (No Man's Sky ≈ 31 GiB)
 
-**Q: When can I play my Minecraft Bedrock?**  
-While Xodus is quickly maturing, there is still a lot of work to support it from Wine standpoint to provide necessary XBOX Services to games.  
-_TL;DR_ soon<sup>tm</sup>
+## Quick start
 
-**Q: How to get involved?**  
-Start by joining our Discord or review any open GitHub issues .
-
-**Q: What games will be supported?**  
-We hope to manage to support most of the catalog, the limitation is the game has to be GDK and in MSIXVC format.  
-So far `Gears of War 4` is a prominent unsupported title for the time being.
-
-**Q: Will XBOX Backward Compatibility on PC work?**  
-While Xodus is capable of downloading and running those titles. It's possible these games will work only after additional patches to wine, dxvk or vkd3d-proton.
-
-## Building
-
-The project structure is as follows.
-
-```
-.
-├── msixvc - [rlib] common rlib crate for utilities for parsing MSIXVC and XSP files
-├── xodus - [rlib] common rlib crate that contains core xodus functionality, API calls abstractions and utilities
-├── xodus-cli - [bin] CLI currently used for iterating over new xodus features
-└── xodus-service - [bin] service process exposing a xodus.sock for IPC communication, it takes care of xgameruntime.dll integration.
+```sh
+git clone -b local/sikarugir-dump https://github.com/diacunap/xodus.git
+cd xodus
+./scripts/bundle-macos.sh        # builds xodus-ui + xodus-cli → target/Xodus.app
+./target/release/xodus-cli login # sign in once (webview)
+open target/Xodus.app
 ```
 
-> [!NOTE]
-> xodus-service aims to become a main point of integration. All xodus clients will connect to it to interact with games and XBOX services.
+In the app: **My library** lists your games, **Supported only** filters to the ones Xodus can
+download, the detail panel has **Download**, and **Downloads** shows the queue and installed games.
 
-### Prerequisites
+Keychain: macOS asks the first time each (re)built binary reads your Xodus credentials —
+choose **Always Allow**. Downloads can't resume yet, so keep the Mac awake and plugged in while they run.
 
-- Rust version 1.98 or later
-- Right now CLI relies on wry and tao to show a login page. Consult https://docs.rs/wry/latest/wry/#platform-considerations
-- xodus-service relies on `protoc` to compile `proto/` definitions make sure to install it for your platform
+## Running a game (manual, for now)
 
-### Running
+```sh
+# decrypt the executables of an installed game
+XODUS_DUMP_DIR=$HOME/Games/xodus/NoMansSky-decrypted \
+  ./target/release/xodus-cli run ~/Games/xodus/NoMansSky /usr/bin/false
 
-Building all crates in release mode
-
-```bash
-cargo build --release --workspace
+# launch with the patched engine + xodus-service (No Man's Sky example)
+./scripts/macos/run-nms.sh
 ```
 
-Running cli in debug
+Step-by-step, engine patches and troubleshooting: [docs/macos/README.md](docs/macos/README.md).
 
-```
-cargo run -- --help
-```
+## What this fork adds
 
-Running xodus-service in debug
+| Area | Path |
+|---|---|
+| Mac app (library, Game Pass, store search, download manager) | `crates/xodus-ui`, `scripts/bundle-macos.sh` |
+| Owned games + Game Pass catalog API | `crates/xodus/src/api/collections.rs` |
+| Machine-readable download progress (`XODUS_PROGRESS_JSON=1`) | `crates/xodus-cli/src/commands/streaming.rs` |
+| Decrypt-to-disk for stock Wine (`XODUS_DUMP_DIR`) | `crates/xodus-cli/src/commands/run.rs` |
+| Mac docs and run script | `docs/macos/`, `scripts/macos/` |
 
-```
-cargo run --bin xodus-service
-```
+## Upstream
 
-Debug and profile `xodus-cli` or `xodus-service` with [tokio-console]([tokio-console](https://github.com/tokio-rs/console))
-
-```
-RUSTFLAGS="--cfg tokio_unstable" cargo run --features tokio_console 
-```
-
-> [!WARNING]
-> For better performance when decrypting MSIXVC files, the `aes` and `ssse3` features are enabled on `x86_64`,
-> and the `aes` feature is enabled on `aarch64`. This means that the program will crash with an illegal instruction
-> error when running on a CPU which doesn't support those instructions.
->
-> See https://en.wikipedia.org/wiki/AES_instruction_set for a list of compatible CPUs (every processor from
-> 2011 onwards should be supported).
-
-### CLI Usage
-
-```
-Usage: xodus-cli <COMMAND>
-
-Commands:
-  download    Download msixvc or xsp files for a given game
-  license     Dump CIKs for use with XvdTool
-  extract     Extract locally stored msixvc file
-  login       
-  streaming   Download and extract the game through streaming algorithm
-  clep        Generate or decrypt base64-encoded CLEP challenge data
-  sp-license  Decode SPLicenseBlock
-  help        Print this message or the help of the given subcommand(s)
-
-Options:
-  -h, --help     Print help
-  -V, --version  Print version
-```
-
-## Special Thanks
-
-- [XvdTool.Streaming](https://github.com/LukeFZ/XvdTool.Streaming) and [CikExtractor](https://github.com/LukeFZ/CikExtractor) by LukeFZ
+Core Xodus (auth, licensing, MSIXVC, xodus-service) is upstream work — build docs, CLI
+reference and FAQ are in [docs/upstream-README.md](docs/upstream-README.md).
+Community: [Discord](https://discord.gg/ZG774FK4tq).
