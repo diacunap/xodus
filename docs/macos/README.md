@@ -33,7 +33,7 @@ Repositories involved:
 
 | Repo | Branch / state | What |
 |---|---|---|
-| this fork of `xodus-gaming/xodus` | `local/sikarugir-dump` | owned-games API, `xodus-ui`, CLI progress JSON, decrypt-dump hack |
+| this fork of `xodus-gaming/xodus` | `macos` | owned-games API, `xodus-ui`, CLI progress JSON, decrypt-dump hack |
 | `diacunap/wine-cx-sikarugir` | `main` + `patches/0002..0005` | Sikarugir engine built from CrossOver 26.3 sources |
 | `xodus-gaming/xgameruntime` | PR #28 (`AnnoyedDev:xgamesave-cloud`, head `3fd4ae1`) | XUser / XStore / XGameSave / XNetworking for Wine |
 | `xodus-gaming/wine` | `bleeding-edge` | source of the AF_UNIX patch (MR 7650) and the `windows.web` JSON commits |
@@ -42,7 +42,7 @@ Repositories involved:
 
 ## What was changed in this fork
 
-Commits on `local/sikarugir-dump` (on top of upstream `53ea781`):
+Commits on `macos` (on top of upstream `53ea781`):
 
 1. **`xodus: add owned games and PC Game Pass catalog API`** — `crates/xodus/src/api/collections.rs`
    - Owned games: `POST https://collections.mp.microsoft.com/v7.0/collections/query`,
@@ -71,7 +71,7 @@ Commits on `local/sikarugir-dump` (on top of upstream `53ea781`):
 | `0002-winevulkan-mask-unsupported-features` | NMS requests `wideLines` (VkPhysicalDeviceFeatures field 15), MoltenVK rejects it with `VK_ERROR_FEATURE_NOT_PRESENT`, the game ignores the error and asserts in `vkGetDeviceQueue`. Opt-in: `WINE_VK_MASK_UNSUPPORTED_FEATURES=1` drops unsupported core feature bits in `vkCreateDevice` (pEnabledFeatures and `VkPhysicalDeviceFeatures2` in pNext). |
 | `0003-afunix-sockets-wine-mr-7650` | AF_UNIX sockets in ntdll/ws2_32/wineserver, required for `xgameruntime` ↔ `xodus-service`. From `xodus-gaming/wine` `6b7313c1bd`. |
 | `0004-xgameruntime-from-xodus-pr28` | Adds `dlls/xgameruntime` (xgameruntime PR #28, `legacy-c` layout) as a Wine builtin + `configure.ac` entry. |
-| `0005-windows-web-json-parsing-from-xodus-wine` | **pending** — see [Next blocker](#next-blocker). |
+| `0005-windows-web-json-parsing-from-xodus-wine` | `Windows.Data.Json` object/array parsing (13 commits by Olivia Ryan / Rémi Bernon from `xodus-gaming/wine` `bleeding-edge`). Needed by `xgameruntime`'s `XUser` to read Xbox Live title endpoints. |
 
 `config.sh`: `ENGINE_REV=4` → `dist/WS12WineCX26.3_4.tar.xz`.
 `scripts/build-wine.sh` now fails the build if `winevulkan.dll` lacks the masking patch or
@@ -86,7 +86,7 @@ Prereqs: Apple Silicon, Rosetta 2, Homebrew, Xcode CLT; `brew install rust proto
 
 ```sh
 # 1. Xodus
-git clone <this fork> xodus && cd xodus && git checkout local/sikarugir-dump
+git clone <this fork> xodus && cd xodus && git checkout macos
 cargo build --release -p xodus-cli -p xodus-service
 ./target/release/xodus-cli login            # sign in with your Microsoft account in the webview
 ./scripts/bundle-macos.sh && open target/Xodus.app   # optional UI

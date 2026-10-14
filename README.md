@@ -39,7 +39,7 @@ Full log of what was done, every blocker and its fix: **[docs/macos/README.md](d
 ## Quick start
 
 ```sh
-git clone -b local/sikarugir-dump https://github.com/diacunap/xodus.git
+git clone -b macos https://github.com/diacunap/xodus.git
 cd xodus
 ./scripts/bundle-macos.sh        # builds xodus-ui + xodus-cli → target/Xodus.app
 ./target/release/xodus-cli login # sign in once (webview)
