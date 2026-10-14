@@ -104,6 +104,9 @@
   .field input { flex: 1; background: var(--card); border: 1px solid var(--line); color: var(--text);
                  padding: 8px 10px; border-radius: 8px; font: 13px ui-monospace, Menlo, monospace; outline: none; }
   .field input:focus { border-color: var(--accent); }
+  .row.saverow { grid-template-columns: 140px 1fr auto; }
+  .row.saverow .chip { font-size: 11px; }
+  .row.saverow.current { box-shadow: inset 3px 0 var(--accent); }
 </style>
 </head>
 <body>
@@ -155,7 +158,7 @@ const ACQ = { purchased: "Purchased", gamepass: "Game Pass", other: "Other" };
 
 const state = { view: "library", cache: {}, items: [], selected: null, cli: "xodus-cli", searchSeq: 0,
                 dl: { jobs: [], installed: [] }, dlError: null, actionError: null,
-                launch: null, opts: { hud: false, debug: false }, settings: null, settingsMsg: null };
+                launch: null, opts: { hud: false, debug: false }, settings: null, settingsMsg: null, saves: null };
 
 function chipsFor(g) {
   const out = [];
@@ -269,7 +272,8 @@ function installedRow(i) {
   return `<div class="row">
     <div class="thumb" style="background-image:url('${esc(i.image || "")}')"></div>
     <div><div class="t">${esc(i.title)}</div><div class="sub">${esc(i.path)}</div><div class="nums">${gb(i.size_bytes)} on disk</div></div>
-    <div class="acts">${playHtml(i, `<button class="btn ghost" data-act="reveal" data-path="${esc(i.path)}">Show in Finder</button>`)}</div></div>`;
+    <div class="acts">${playHtml(i, `<button class="btn ghost" data-act="saves" data-path="${esc(i.path)}">Saves</button>
+      <button class="btn ghost" data-act="reveal" data-path="${esc(i.path)}">Show in Finder</button>`)}</div></div>`;
 }
 
 // ---- Play ----
@@ -322,6 +326,112 @@ function renderInstalled() {
       : `<div class="note">No games in ~/Games/xodus yet. Download one from My library.</div>`}</section>`;
 }
 
+// ---- Saves ----
+const KIND = { current: ["ok", "Current"], snapshot: ["", "Snapshot"], cloud_backup: ["warn", "Cloud sync backup"],
+               manual_backup: ["", "Manual backup"], replaced: ["bad", "Replaced on restore"] };
+const when = s => s ? new Date(s * 1000).toLocaleString() : "?";
+const kb = b => b >= 1e6 ? (b / 1e6).toFixed(1) + " MB" : Math.ceil(b / 1e3) + " KB";
+
+function openSaves(path) {
+  const inst = state.dl.installed.find(i => i.path === path);
+  state.saves = { path, title: inst?.title || path, data: null, err: null, msg: null, confirm: null, working: false };
+  load("saves");
+}
+
+async function refreshSaves() {
+  const s = state.saves; if (!s || s.working) return;
+  try { const data = await rpc("saves_list", s.path); if (state.saves === s) { s.data = data; s.loadErr = null; } }
+  catch (e) { if (state.saves === s) s.loadErr = e.message; }
+  if (state.view === "saves" && state.saves === s) renderSavesBody();
+}
+
+function renderSaves() {
+  const s = state.saves;
+  $("#count").textContent = "";
+  $("#dl").innerHTML = `<section><span class="link" data-act="back_installed">← Installed</span>
+      <h3 style="margin-top:14px">Saves · ${esc(s.title)}</h3>
+      <div class="field"><input id="snapLabel" maxlength="40" spellcheck="false" placeholder="Optional label, e.g. before-boss">
+        <button class="btn" data-act="snapshot">Take snapshot</button></div>
+      <div class="note">A snapshot copies the current save folder to ~/Games/xodus/save-snapshots. Restore first snapshots the
+        current saves ("before-restore") and keeps the replaced folder as files.replaced-*; nothing is deleted.
+        With cloud sync on, a newer cloud save can replace a restored older one on the next launch (it is backed up first).</div>
+    </section><div id="savesBody"></div>`;
+  renderSavesBody();
+}
+
+function renderSavesBody() {
+  const s = state.saves, d = s.data, el = $("#savesBody"); if (!el) return;
+  const top = [];
+  if (s.working) top.push(`<div class="note"><span class="spin"></span> Working…</div>`);
+  if (s.msg) top.push(`<div class="status ok">${esc(s.msg)}</div>`);
+  if (s.err) top.push(`<div class="msg">${esc(s.err)}</div>`);
+  if (s.loadErr) top.push(`<div class="msg">${esc(s.loadErr)}</div>`);
+  if (!d) { el.innerHTML = top.join("") + (s.loadErr ? "" : `<div class="note"><span class="spin"></span> Loading…</div>`); return; }
+  const blocked = d.restore_blocked;
+  if (blocked) top.push(`<div class="status warn">Restore is disabled: ${esc(blocked)}. Quit the game to restore a version.</div>`);
+  if (!d.prefix) top.push(`<div class="note">No Wine prefix yet (~/Games/xodus/prefixes/${esc(d.game)}). Play the game once to create it.</div>`);
+  else if (!d.groups.length) top.push(`<div class="note">No XGameSaveFiles folder in ${esc(d.prefix)} yet.</div>`);
+  const many = d.groups.length > 1;
+  el.innerHTML = top.join("") + d.groups.map(g => `<section>
+      <h3>${many ? `Save folder ${esc(g.xuid)} / ${esc(g.scid)}
+        <button class="btn ghost" data-act="snapshot" data-group="${esc(g.id)}" style="margin-left:8px">Snapshot this</button>`
+        : `Versions`}</h3>
+      ${g.versions.map(v => versionRow(v, blocked)).join("") || `<div class="note">No saves yet.</div>`}
+      ${g.other.length ? `<div class="note">Other items in ${esc(g.dir)} (read-only): ${g.other.map(o => `${esc(o.name)} (${kb(o.size)})`).join(", ")}</div>` : ""}
+    </section>`).join("");
+}
+
+function versionRow(v, blocked) {
+  const s = state.saves, [cls, label] = KIND[v.kind] || ["", v.kind];
+  const acts = [];
+  if (v.kind !== "current") {
+    if (s.confirm === v.id && !blocked)
+      acts.push(`<button class="btn" data-act="restore_go" data-vid="${esc(v.id)}" ${s.working ? "disabled" : ""}>Confirm restore</button>
+                 <button class="btn ghost" data-act="restore_cancel">Cancel</button>`);
+    else {
+      const why = blocked || (s.working ? "Working…" : "");
+      acts.push(`<button class="btn ghost" data-act="restore" data-vid="${esc(v.id)}" ${why ? `disabled title="${esc(why)}"` : ""}>Restore</button>`);
+    }
+  }
+  acts.push(`<button class="btn ghost" data-act="saves_reveal" data-vid="${esc(v.id)}">Show in Finder</button>`);
+  const sub = v.kind === "current" ? `Last saved ${when(v.saved)}`
+            : `${when(v.time ?? v.saved)}${v.saved ? ` · newest save inside: ${when(v.saved)}` : ""}`;
+  return `<div class="row saverow ${v.kind === "current" ? "current" : ""}">
+    <div><span class="chip ${cls}">${label}</span></div>
+    <div><div class="t" title="${esc(v.path)}">${esc(v.label || v.name)}</div><div class="sub">${esc(sub)}</div>
+      <div class="nums">${kb(v.size)} · ${esc(v.entries.join(", ") || "empty")}</div></div>
+    <div class="acts">${acts.join("")}</div></div>`;
+}
+
+async function savesAct(act, el) {
+  const s = state.saves; if (!s) return;
+  const { vid, group } = el.dataset;
+  if (act === "restore") { s.confirm = vid; s.err = null; return renderSavesBody(); }
+  if (act === "restore_cancel") { s.confirm = null; return renderSavesBody(); }
+  s.err = null;
+  if (act === "saves_reveal") {
+    try { await rpc("saves_reveal", JSON.stringify({ path: s.path, version_id: vid })); }
+    catch (e) { s.err = e.message; renderSavesBody(); }
+    return;
+  }
+  s.msg = null; s.working = true; renderSavesBody();
+  try {
+    if (act === "snapshot") {
+      const label = $("#snapLabel")?.value.trim() || null;
+      const v = await rpc("saves_snapshot", JSON.stringify({ path: s.path, label, group: group || null }));
+      s.msg = `Snapshot "${v.name}" taken (${kb(v.size)}).`;
+      if ($("#snapLabel")) $("#snapLabel").value = "";
+    } else if (act === "restore_go") {
+      const r = await rpc("saves_restore", JSON.stringify({ path: s.path, version_id: vid }));
+      s.msg = `Restored "${r.restored_name}".`
+            + (r.auto_snapshot ? ` The previous saves were snapshotted as "${r.auto_snapshot}"` : "")
+            + (r.replaced ? `${r.auto_snapshot ? " and" : " The previous saves were"} kept as ${r.replaced}.` : r.auto_snapshot ? "." : "");
+    }
+  } catch (e) { s.err = e.message; }
+  s.confirm = null; s.working = false;
+  await refreshSaves();
+}
+
 const RANK = { downloading: 0, queued: 1 };
 function renderDownloads() {
   const jobs = [...state.dl.jobs].sort((a, b) => (RANK[a.state] ?? 2) - (RANK[b.state] ?? 2)
@@ -349,6 +459,9 @@ async function refreshDownloads() {
 
 async function act(el) {
   const { act, id, path } = el.dataset;
+  if (act === "saves") return openSaves(path);
+  if (act === "back_installed") return load("installed");
+  if (["snapshot", "restore", "restore_cancel", "restore_go", "saves_reveal"].includes(act)) return savesAct(act, el);
   const g = state.selected?.product_id === id ? state.selected : null;
   const j = jobFor(id);
   state.actionError = null;
@@ -374,16 +487,18 @@ async function act(el) {
 }
 document.addEventListener("click", e => { const b = e.target.closest("[data-act]"); if (b && !b.disabled) act(b); });
 setInterval(() => { if (state.view === "downloads" || state.view === "installed" || activeCount() || launchActive()) refreshDownloads(); }, 1000);
+setInterval(() => { if (state.view === "saves" && !state.saves?.confirm) refreshSaves(); }, 3000);
 
 async function load(view) {
   state.view = view; state.selected = null; state.items = []; state.actionError = null;
   $("#detail").hidden = true; $("#content").classList.remove("with-detail");
-  document.querySelectorAll("nav button").forEach(b => b.classList.toggle("active", b.dataset.view === view));
-  const panel = view === "downloads" || view === "installed" || view === "settings";
+  document.querySelectorAll("nav button").forEach(b => b.classList.toggle("active", b.dataset.view === (view === "saves" ? "installed" : view)));
+  const panel = view === "downloads" || view === "installed" || view === "settings" || view === "saves";
   $("#dl").hidden = !panel; $("#grid").hidden = panel;
   document.querySelectorAll("header > *:not(.count)").forEach(el => el.hidden = panel);
   if (view === "downloads") { state.dlError = null; renderDownloads(); refreshDownloads(); return; }
   if (view === "installed") { state.dlError = null; renderInstalled(); refreshDownloads(); return; }
+  if (view === "saves") { renderSaves(); refreshSaves(); return; }
   $("#instFilter").hidden = view !== "library";
   if (view === "settings") {
     state.settingsMsg = null; renderSettings();

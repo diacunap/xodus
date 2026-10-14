@@ -7245,6 +7245,7 @@ dependencies = [
 name = "xodus-ui"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "futures-util",
  "reqwest 0.13.4",
  "serde",

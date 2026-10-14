@@ -13,6 +13,7 @@
 use std::collections::VecDeque;
 use std::path::{Component, Path, PathBuf};
 use std::process::Stdio;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -86,6 +87,17 @@ pub struct Launcher {
     settings_path: PathBuf,
     settings: Mutex<Settings>,
     run: Mutex<Option<Run>>,
+    /// A save restore is in progress: Play waits for it.
+    saves_busy: AtomicBool,
+}
+
+/// Held while saves are being restored; see [`Launcher::saves_guard`].
+pub struct SavesGuard<'a>(&'a AtomicBool);
+
+impl Drop for SavesGuard<'_> {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::SeqCst);
+    }
 }
 
 impl Launcher {
@@ -102,6 +114,7 @@ impl Launcher {
             settings_path,
             settings: Mutex::new(settings),
             run: Mutex::new(None),
+            saves_busy: AtomicBool::new(false),
         })
     }
 
@@ -126,6 +139,24 @@ impl Launcher {
 
     pub fn status(&self) -> Value {
         json!(*self.run.lock().unwrap())
+    }
+
+    /// Why saves cannot be restored right now (a game is preparing or running).
+    pub fn busy_reason(&self) -> Option<String> {
+        busy(&self.run.lock().unwrap())
+    }
+
+    /// Refuse if a game is preparing/running, else block Play until the guard is dropped.
+    /// Checked and set under the run lock, like `launch`, so the two cannot interleave.
+    pub fn saves_guard(&self) -> Result<SavesGuard<'_>, Error> {
+        let slot = self.run.lock().unwrap();
+        if let Some(why) = busy(&slot) {
+            return Err(format!("Cannot restore saves while {why}. Quit the game first.").into());
+        }
+        if self.saves_busy.swap(true, Ordering::SeqCst) {
+            return Err("another save restore is in progress".into());
+        }
+        Ok(SavesGuard(&self.saves_busy))
     }
 
     /// Validate quickly, then prepare and run the game in the background.
@@ -186,6 +217,9 @@ impl Launcher {
             let mut slot = self.run.lock().unwrap();
             if slot.as_ref().is_some_and(|r| matches!(r.state, RunState::Preparing | RunState::Running)) {
                 return Err("another game is already starting".into());
+            }
+            if self.saves_busy.load(Ordering::SeqCst) {
+                return Err("saves are being restored; try again in a moment".into());
             }
             *slot = Some(run.clone());
         }
@@ -438,6 +472,15 @@ struct Opts {
     debug: bool,
 }
 
+fn busy(run: &Option<Run>) -> Option<String> {
+    let run = run.as_ref()?;
+    match run.state {
+        RunState::Preparing => Some(format!("{} is starting", run.title)),
+        RunState::Running => Some(format!("{} is running", run.title)),
+        RunState::Exited | RunState::Failed => None,
+    }
+}
+
 /// `G` + suffix, next to `G`.
 fn sibling(game: &Path, suffix: &str) -> PathBuf {
     let mut name = game.file_name().unwrap_or_default().to_os_string();
@@ -445,7 +488,7 @@ fn sibling(game: &Path, suffix: &str) -> PathBuf {
     game.with_file_name(name)
 }
 
-fn safe_name(s: &str) -> String {
+pub fn safe_name(s: &str) -> String {
     let name: String = s.chars().filter(char::is_ascii_alphanumeric).collect();
     if name.is_empty() { "Game".into() } else { name }
 }
@@ -631,6 +674,46 @@ mod tests {
         assert!(is_derived_dir(Path::new("/g/NoMansSky-run.partial")));
         assert!(!is_derived_dir(Path::new("/g/NoMansSky")));
         assert_eq!(sibling(Path::new("/g/NoMansSky"), "-run"), Path::new("/g/NoMansSky-run"));
+    }
+
+    #[test]
+    fn saves_guard_refuses_while_a_game_runs_and_blocks_play() {
+        let base = std::env::temp_dir().join(format!("xodus-launcher-guard-{}", std::process::id()));
+        let launcher = Launcher {
+            app_dir: base.clone(),
+            root: base.clone(),
+            settings_path: base.join("settings.json"),
+            settings: Mutex::new(Settings { engine: base.join("engine") }),
+            run: Mutex::new(None),
+            saves_busy: AtomicBool::new(false),
+        };
+        let mut run = Run {
+            product_id: None,
+            title: "No Man's Sky".into(),
+            path: base.join("NoMansSky"),
+            state: RunState::Running,
+            status: "Running".into(),
+            error: None,
+            exit_code: None,
+            stopped: false,
+            started_at: None,
+            log: base.join("x.log"),
+            prefix: base.join("prefix"),
+        };
+        for state in [RunState::Preparing, RunState::Running] {
+            run.state = state;
+            *launcher.run.lock().unwrap() = Some(run.clone());
+            assert!(launcher.busy_reason().is_some());
+            assert!(launcher.saves_guard().is_err());
+        }
+        run.state = RunState::Exited;
+        *launcher.run.lock().unwrap() = Some(run);
+        assert_eq!(launcher.busy_reason(), None);
+        let guard = launcher.saves_guard().unwrap();
+        assert!(launcher.saves_guard().is_err(), "one restore at a time");
+        assert!(launcher.saves_busy.load(Ordering::SeqCst));
+        drop(guard);
+        assert!(!launcher.saves_busy.load(Ordering::SeqCst));
     }
 
     #[tokio::test]

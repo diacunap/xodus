@@ -7,7 +7,9 @@ mod catalog;
 mod downloads;
 mod launcher;
 mod library;
+mod saves;
 
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use serde::Deserialize;
@@ -32,6 +34,7 @@ struct Ctx {
     tokens: TokenManager,
     downloads: Arc<downloads::Downloads>,
     launcher: Arc<launcher::Launcher>,
+    saves: Arc<saves::Saves>,
 }
 
 fn main() {
@@ -53,6 +56,9 @@ fn main() {
         tokens: TokenManager::with_default_storage(),
         downloads: downloads::Downloads::load(app_dir.join("xodus-cli")),
         launcher: launcher::Launcher::load(app_dir),
+        saves: Arc::new(saves::Saves::new(
+            PathBuf::from(std::env::var_os("HOME").unwrap_or_default()).join("Games/xodus"),
+        )),
     });
     rt.block_on(xodus::tokens::device::ensure_device_credentials(&ctx.client, &ctx.tokens));
 
@@ -148,6 +154,30 @@ async fn handle_cmd(ctx: &Ctx, cmd: &str, arg: &str) -> Result<Value, catalog::E
         "open_log" => ctx.launcher.open_log().await.map(|_| Value::Null),
         "get_settings" => Ok(ctx.launcher.settings()),
         "set_settings" => ctx.launcher.set_settings(arg),
+        "saves_list" => {
+            let (saves, path, busy) = (ctx.saves.clone(), arg.to_owned(), ctx.launcher.busy_reason());
+            tokio::task::spawn_blocking(move || saves.list(&path, busy)).await?
+        }
+        "saves_snapshot" => {
+            let (saves, req) = (ctx.saves.clone(), serde_json::from_str::<saves::SnapshotRequest>(arg)?);
+            let v = tokio::task::spawn_blocking(move || saves.snapshot(&req)).await??;
+            Ok(serde_json::to_value(v)?)
+        }
+        "saves_restore" => {
+            let req = serde_json::from_str::<saves::VersionRequest>(arg)?;
+            // Held across the copy: Play is refused until the restore is done.
+            let _guard = ctx.launcher.saves_guard()?;
+            let saves = ctx.saves.clone();
+            tokio::task::spawn_blocking(move || saves.restore(&req, None)).await?
+        }
+        "saves_reveal" => {
+            let path = ctx.saves.version_path(&serde_json::from_str(arg)?)?;
+            let status = tokio::process::Command::new("open").arg(&path).status().await?;
+            if !status.success() {
+                return Err(format!("open exited with {status}").into());
+            }
+            Ok(Value::Null)
+        }
         other => Err(format!("unknown command {other}").into()),
     }
 }
