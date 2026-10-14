@@ -4,10 +4,9 @@ Status log of getting an Xbox PC / Microsoft Store **GDK** title — **No Man's 
 (Store id `BQVQTL3PCH05`, MSIXVC, ~31 GiB) — to run natively-translated on an
 M4 MacBook Pro (macOS 27.0.1) using Xodus + a self-built CrossOver/Wine engine.
 
-**Current stage (2026-10-13):** the game downloads, decrypts, boots, renders through
-Vulkan → MoltenVK → Metal and reaches the **title screen** ("Press A to begin").
-Pressing start triggers Xbox Live sign-in (`XUserAddAsync`), which fails because the
-engine's `windows.web.dll` cannot parse JSON objects (see [Next blocker](#next-blocker)).
+**Current stage (2026-10-13): playable.** The game downloads, decrypts, boots, renders
+through Vulkan → MoltenVK → Metal, signs into Xbox Live, creates a save and loads onto a
+planet on an M4 / macOS 27. Remaining work: performance, cloud save sync, upscaling.
 
 > Unofficial and experimental. You need a legitimate license for the game on the
 > Microsoft account you log in with. Nothing here bypasses licensing: decryption uses
@@ -71,6 +70,9 @@ Commits on `macos` (on top of upstream `53ea781`):
 | `0002-winevulkan-mask-unsupported-features` | NMS requests `wideLines` (VkPhysicalDeviceFeatures field 15), MoltenVK rejects it with `VK_ERROR_FEATURE_NOT_PRESENT`, the game ignores the error and asserts in `vkGetDeviceQueue`. Opt-in: `WINE_VK_MASK_UNSUPPORTED_FEATURES=1` drops unsupported core feature bits in `vkCreateDevice` (pEnabledFeatures and `VkPhysicalDeviceFeatures2` in pNext). |
 | `0003-afunix-sockets-wine-mr-7650` | AF_UNIX sockets in ntdll/ws2_32/wineserver, required for `xgameruntime` ↔ `xodus-service`. From `xodus-gaming/wine` `6b7313c1bd`. |
 | `0004-xgameruntime-from-xodus-pr28` | Adds `dlls/xgameruntime` (xgameruntime PR #28, `legacy-c` layout) as a Wine builtin + `configure.ac` entry. |
+| `0006-xgameruntime-xuser-state-and-privileges` | `XUserGetState`=SignedIn, `GetIsGuest`, `GetAgeGroup`, `CheckPrivilege` grants (were `E_NOTIMPL`; game stayed on the title screen after sign-in). |
+| `0007-xgameruntime-xgamesavefiles-local-folder` | `XGameSaveFilesGetFolderWithUiAsync/Result` + quota → `%LOCALAPPDATA%\XodusGameSave\<xuid>\<scid>\files` (local only, no cloud sync yet). |
+| `0008-kernelbase-mirror-fiberdata-into-gs-on-macos` | **macOS-specific, generic fix.** MSVC `GetCurrentFiber()` reads `%gs:0x20`; on macOS `%gs` is the pthread TSD base and slot 4 is the QoS class, so fiber job systems switch into garbage (`SwitchToFiber(0x8ff)`). Mirrors FiberData into `%gs:0x20` (opt-out `WINE_FIBER_GS_MIRROR=0`). |
 | `0005-windows-web-json-parsing-from-xodus-wine` | `Windows.Data.Json` object/array parsing (13 commits by Olivia Ryan / Rémi Bernon from `xodus-gaming/wine` `bleeding-edge`). Needed by `xgameruntime`'s `XUser` to read Xbox Live title endpoints. |
 
 `config.sh`: `ENGINE_REV=4` → `dist/WS12WineCX26.3_4.tar.xz`.
@@ -125,9 +127,13 @@ Logs: `~/Games/xodus/logs/` (`nms-wine.log`, `xodus-service.log`) and the game's
 | 2 | Assertion `!status && "vkGetDeviceQueue"` right after start | `wideLines` unsupported by MoltenVK; game ignores `vkCreateDevice` failure | patch 0002 |
 | 3 | Hello Games logo, then page fault in `xcurl.dll` → `ntdll` | `xgameruntime` from `main` only implements XThreading; XNetworking etc. return `E_NOINTERFACE` | builtin xgameruntime from PR #28 (patch 0004) + AF_UNIX (0003) |
 | 4 | Silent exit code 1 before `xgameruntime` loads | `system32\xgameruntime.dll` missing (GDK loads it from system32; it had been deleted from the prefix) | copy the engine's builtin into `system32` (done in run script) |
-| 5 | **Title screen, input ignored after "Press A"** | `XUserAddAsync` → `load_endpoints` → `Windows.Data.Json` parse fails: `fixme:web:parse_json_value Object parsing not implemented!` → `E_NOTIMPL`; error dialog is a stub so nothing shows | **pending patch 0005** |
+| 5 | Title screen, input ignored after "Press A" | `XUserAddAsync` → `load_endpoints` → `Windows.Data.Json` parse fails (`Object parsing not implemented!`) → `E_NOTIMPL`; error dialog is a stub | patch 0005 |
+| 6 | Signed in, still stuck on title | `XUserGetState` / `XUserCheckPrivilege` stubs | patch 0006 |
+| 7 | Endless red loading ring | `XGameSaveFilesGetFolderWithUiAsync` stub | patch 0007 |
+| 8 | Very slow; `wineserver` ~65% CPU, game ~1 core | no fast sync | `WINEMSYNC=1` (run script) |
+| 9 | `SwitchToFiber` page fault on `0x8ff` in a `Background` thread; planet never loads | inline `GetCurrentFiber()` reads macOS QoS TSD slot via `%gs:0x20` | patch 0008 |
 
-### Next blocker
+### Notes on blocker 5 (historical)
 
 CrossOver 26.3's `dlls/windows.web` only parses JSON scalars. `xodus-gaming/wine`
 `bleeding-edge` has the full implementation (13 commits by Olivia Ryan / Rémi Bernon,
