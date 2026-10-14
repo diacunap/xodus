@@ -159,6 +159,25 @@ check the `gdkc` channel in the Wine log rather than the screen.
 
 ---
 
+## Credentials storage
+
+Tokens live in `~/Library/Application Support/Xodus/secrets.enc` (mode 0600):
+AES-256-GCM, key = HKDF-SHA256 over the Mac's `IOPlatformUUID` + a random salt
+(`crates/xodus/src/tokens/backend/encrypted_file.rs`). On first read each key is
+migrated from the macOS Keychain (one last Keychain prompt per binary); the Keychain
+items are left in place as a backup. Threat model: a copied file is useless on another
+machine, but any process running as your user on this Mac can decrypt it (comparable to
+an approved Keychain item). `XODUS_SECRETS=keychain` keeps using the Keychain instead.
+`xodus-cli logout` removes the keys from both.
+
+## Cloud saves (XGameSaveFiles)
+
+Engine patch `0009` adds a **download-only** sync of the XGameSaveFiles folder from Xbox
+connected storage (no upload/delete code path). Before writing it backs up the local
+folder to `files.bak-YYYYmmdd-HHMMSS`. `XODUS_SAVE_SYNC`: unset/`auto` = take a cloud
+container only if it is newer than the local one; `download` = take every cloud container
+(after the backup); `off` = skip. Not yet verified against the live service.
+
 ## Gotchas
 
 - **Keychain prompts:** ad-hoc signed binaries are pinned by cdhash, so every rebuild of

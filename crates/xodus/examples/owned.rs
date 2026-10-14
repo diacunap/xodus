@@ -8,7 +8,7 @@ const NO_MANS_SKY: &str = "BQVQTL3PCH05";
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     xodus::secrets::init_secrets()?;
-    let tokens = TokenManager::with_keychain_and_memory();
+    let tokens = TokenManager::with_default_storage();
     let client = reqwest::Client::new();
     xodus::tokens::device::ensure_device_credentials(&client, &tokens).await;
 

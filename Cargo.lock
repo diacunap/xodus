@@ -1653,7 +1653,7 @@ dependencies = [
  "ff 0.13.1",
  "generic-array 0.14.7",
  "group 0.13.0",
- "hkdf",
+ "hkdf 0.12.4",
  "pem-rfc7468",
  "pkcs8 0.10.2",
  "rand_core 0.6.4",
@@ -2442,6 +2442,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "hkdf"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4aaa26c720c68b866f2c96ef5c1264b3e6f473fe5d4ce61cd44bbe913e553018"
+dependencies = [
+ "hmac 0.13.0",
+]
+
+[[package]]
 name = "hmac"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3084,7 +3093,7 @@ dependencies = [
  "ed448-goldilocks",
  "generic-array 0.14.7",
  "getrandom 0.4.3",
- "hkdf",
+ "hkdf 0.12.4",
  "hmac 0.12.1",
  "md-5",
  "ml-dsa",
@@ -4368,6 +4377,16 @@ name = "quick-xml"
 version = "0.31.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1004a344b30a54e2ee58d66a71b32d2db2feb0a31f9a2d302bf0536f15de2a33"
+dependencies = [
+ "memchr",
+ "serde",
+]
+
+[[package]]
+name = "quick-xml"
+version = "0.41.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e660451e55124f798a69a5af3f49ccfbefbd41910eefd25caf2393e1f3473ec1"
 dependencies = [
  "memchr",
  "serde",
@@ -7136,6 +7155,7 @@ name = "xodus"
 version = "0.1.0"
 dependencies = [
  "aes 0.9.3",
+ "aes-gcm",
  "aes-keywrap",
  "apple-native-keyring-store",
  "base64 0.23.1",
@@ -7145,7 +7165,9 @@ dependencies = [
  "chrono",
  "dbus-secret-service-keyring-store",
  "ed25519-dalek 3.0.0",
+ "fs2",
  "globset",
+ "hkdf 0.13.0",
  "hmac 0.13.0",
  "keyring-core",
  "kryptering",
@@ -7188,7 +7210,7 @@ dependencies = [
  "inquire",
  "msixvc",
  "nix",
- "quick-xml",
+ "quick-xml 0.41.0",
  "reqwest 0.13.4",
  "rustix",
  "serde",

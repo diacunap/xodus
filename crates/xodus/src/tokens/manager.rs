@@ -4,7 +4,7 @@ use std::time::Instant;
 
 use crate::models::secrets::{Device, Token, TokenStore, User};
 use crate::models::xbox::XstsResponse;
-use crate::tokens::backend::{KeychainBackend, MemoryBackend};
+use crate::tokens::backend::{EncryptedFileBackend, KeychainBackend, MemoryBackend};
 use crate::tokens::store::{ExpiringTokenBackend, TokenBackend, TokenStoreError};
 
 mod keys {
@@ -37,8 +37,24 @@ impl TokenManager {
         }
     }
 
-    /// Keychain for persistent storage, in-memory for ephemeral - the default
-    /// wiring for both `xodus-cli` and `xodus-service` today.
+    /// Default wiring for the CLI, service and UI: persistent secrets in an
+    /// encrypted file bound to this machine (no keychain prompt after every
+    /// rebuild of an ad-hoc signed binary), migrating keys from the keychain on
+    /// first read. `XODUS_SECRETS=keychain` keeps using the OS keychain instead.
+    pub fn with_default_storage() -> Self {
+        if std::env::var("XODUS_SECRETS").is_ok_and(|v| v.eq_ignore_ascii_case("keychain")) {
+            return Self::with_keychain_and_memory();
+        }
+        Self::new(
+            Arc::new(EncryptedFileBackend::new(
+                EncryptedFileBackend::default_path(),
+                Some(Box::new(KeychainBackend)),
+            )),
+            Arc::new(MemoryBackend::default()),
+        )
+    }
+
+    /// Keychain for persistent storage, in-memory for ephemeral.
     pub fn with_keychain_and_memory() -> Self {
         Self::new(
             Arc::new(KeychainBackend),
