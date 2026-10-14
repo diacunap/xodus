@@ -37,7 +37,18 @@ fi
 
 export WINEDLLOVERRIDES="xgameruntime=b;vulkan-1=b"
 export WINE_VK_MASK_UNSUPPORTED_FEATURES=1
-export WINEDEBUG="${WINEDEBUG:-+loaddll,err+all,fixme+all,warn+vulkan,+xgameruntime,+gdkc}"
+# Fast sync: without msync every mutex/event round-trips through wineserver
+# (seen as wineserver at ~70% CPU and the game stuck at one core).
+export WINEMSYNC="${WINEMSYNC:-1}"
+# XODUS_HUD=1: Apple's Metal performance HUD (FPS, frame/GPU time) to measure tuning.
+[ "${XODUS_HUD:-0}" = 1 ] && export MTL_HUD_ENABLED=1
+if [ "${XODUS_DEBUG:-0}" = 1 ]; then
+  export WINEDEBUG="${WINEDEBUG:-+loaddll,err+all,fixme+all,warn+vulkan,+xgameruntime}"
+  export MVK_CONFIG_LOG_LEVEL="${MVK_CONFIG_LOG_LEVEL:-3}"
+else
+  export WINEDEBUG="${WINEDEBUG:--all}"
+  export MVK_CONFIG_LOG_LEVEL="${MVK_CONFIG_LOG_LEVEL:-1}"   # errors only; warnings also flood FullLog.txt
+fi
 
 cd "$RUN/Binaries"
 exec "$WINE" NMS.exe > "$LOGS/nms-wine.log" 2>&1
