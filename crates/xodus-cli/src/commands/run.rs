@@ -201,11 +201,32 @@ pub async fn run(
 
         let stdf = game_exe.into_std().await;
 
+        // Opt-in stopgap for Wine builds without the xodus fd-map patch
+        // (WINE_DLL_FILE_MAP), e.g. stock CrossOver/GPTK-based Wine on macOS:
+        // when XODUS_DUMP_DIR is set, write each decrypted file there and exit
+        // instead of launching Wine. Unset (the default), nothing changes.
+        // Note this leaves decrypted executables on disk.
+        if let Ok(dump_dir) = std::env::var("XODUS_DUMP_DIR") {
+            use std::io::{Seek, SeekFrom};
+            let dest = Path::new(&dump_dir).join(file.0.trim_start_matches('\\').replace('\\', "/"));
+            std::fs::create_dir_all(dest.parent().unwrap()).unwrap();
+            let mut src = &stdf;
+            src.seek(SeekFrom::Start(0)).unwrap();
+            let n = std::io::copy(&mut src, &mut std::fs::File::create(&dest).unwrap()).unwrap();
+            println!("dumped {} ({} bytes)", dest.display(), n);
+            continue;
+        }
+
         let mut flags = fcntl_getfd(stdf.as_fd()).unwrap();
         flags.remove(FdFlags::CLOEXEC);
         fcntl_setfd(stdf.as_fd(), flags).unwrap();
 
         fds.push((file.0, stdf.into_raw_fd()));
+    }
+
+    if std::env::var("XODUS_DUMP_DIR").is_ok() {
+        cleanup().await;
+        return ExitCode::SUCCESS;
     }
 
     let mut env_value = String::new();
