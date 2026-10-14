@@ -176,7 +176,20 @@ Engine patch `0009` adds a **download-only** sync of the XGameSaveFiles folder f
 connected storage (no upload/delete code path). Before writing it backs up the local
 folder to `files.bak-YYYYmmdd-HHMMSS`. `XODUS_SAVE_SYNC`: unset/`auto` = take a cloud
 container only if it is newer than the local one; `download` = take every cloud container
-(after the backup); `off` = skip. Not yet verified against the live service.
+(after the backup); `off` = skip. **Verified live (2026-10-13)** on No Man's Sky: 17 cloud
+containers, 15 downloaded (Settings, Slot2–Slot8), 2 kept local (newer), 0 failed, backup
+created. Upload back to the cloud is not implemented yet.
+
+**Save versions (xodus-ui → Installed → Saves, `crates/xodus-ui/src/saves.rs`).** Lists, per
+`<xuid>/<scid>`: the live `files`, the engine's `files.bak-*`, `files.replaced-*` (left by a restore),
+snapshots in `~/Games/xodus/save-snapshots/<Name>/<xuid>-<scid>/<stamp>[-label]/files` (+ `snapshot.json`)
+and hand-made backups `~/Games/xodus/save-backups/<Name>-*`. Snapshot = copy of `files` (mtimes kept).
+Restore is refused while a game is preparing/running in the app *or* the prefix's wineserver socket
+exists (`/tmp/.wine-<uid>/server-<dev>-<ino>/socket`, catches games started by `run-nms.sh`); it
+snapshots the current saves (`before-restore`), copies the version to `files.restore-tmp`, then
+renames `files` → `files.replaced-<ts>` and the copy → `files`. Nothing is ever deleted (no delete
+action; clean up old versions in Finder). With `XODUS_SAVE_SYNC=auto` a newer cloud save can replace a
+restored older one on the next launch (backed up as `files.bak-*` first).
 
 ## Gotchas
 
