@@ -151,7 +151,7 @@ async fn main() -> ExitCode {
     let args = CliArgs::parse();
 
     xodus::secrets::init_secrets().expect("Unable to initialize credentials");
-    let tokens = TokenManager::with_keychain_and_memory();
+    let tokens = TokenManager::with_default_storage();
 
     // Clep/SpLicense are pure local data transforms and Logout only removes
     // stored credentials - none of them need a device identity, so don't

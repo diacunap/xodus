@@ -191,7 +191,7 @@ pub async fn do_sisu(
 async fn test_minecraft_win_auth() {
     let client = reqwest::Client::new();
     crate::secrets::init_secrets().expect("Unable to initialize credentials");
-    let tokens = TokenManager::with_keychain_and_memory();
+    let tokens = TokenManager::with_default_storage();
 
     let (_, resp, _) = do_sisu(&client, &tokens, "0000000040159362", 896928775)
         .await
