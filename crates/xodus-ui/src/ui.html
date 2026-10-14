@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Xodus</title>
+<style>
+  :root {
+    --bg: #0d0f12; --panel: #15181d; --card: #1b1f26; --line: #262b33;
+    --text: #e8eaed; --muted: #8b929c; --accent: #3fbf5f; --warn: #e0a83a; --bad: #d65c5c;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+         display: grid; grid-template-columns: 200px 1fr; height: 100vh; overflow: hidden; }
+  nav { background: var(--panel); border-right: 1px solid var(--line); padding: 18px 12px;
+        display: flex; flex-direction: column; gap: 4px; }
+  nav h1 { font-size: 18px; margin: 0 8px 18px; letter-spacing: .5px; }
+  nav h1 span { color: var(--accent); }
+  nav button { all: unset; cursor: pointer; padding: 9px 10px; border-radius: 7px; color: var(--muted); }
+  nav button:hover { background: var(--card); color: var(--text); }
+  nav button.active { background: var(--card); color: var(--text); box-shadow: inset 3px 0 var(--accent); }
+  nav .user { margin-top: auto; font-size: 12px; color: var(--muted); padding: 0 8px; word-break: break-all; }
+  main { display: flex; flex-direction: column; min-width: 0; }
+  header { display: flex; gap: 12px; align-items: center; padding: 14px 20px; border-bottom: 1px solid var(--line); }
+  header input[type=search] { flex: 1; background: var(--card); border: 1px solid var(--line); color: var(--text);
+                              padding: 9px 12px; border-radius: 8px; font-size: 14px; outline: none; }
+  header input[type=search]:focus { border-color: var(--accent); }
+  header label { color: var(--muted); font-size: 13px; white-space: nowrap; user-select: none; }
+  .count { color: var(--muted); font-size: 13px; white-space: nowrap; }
+  .content { flex: 1; display: grid; grid-template-columns: 1fr; overflow: hidden; }
+  .content.with-detail { grid-template-columns: 1fr 340px; }
+  #grid { overflow-y: auto; padding: 20px; display: grid; gap: 16px; align-content: start;
+          grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  .card { background: var(--card); border-radius: 10px; overflow: hidden; cursor: pointer;
+          border: 1px solid transparent; transition: transform .12s, border-color .12s; }
+  .card:hover { transform: translateY(-2px); border-color: var(--line); }
+  .card.selected { border-color: var(--accent); }
+  .poster { aspect-ratio: 2/3; background: #222 center/cover no-repeat; }
+  .card .meta { padding: 8px 10px 10px; }
+  .card .t { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chips { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
+  .chip { font-size: 10.5px; padding: 1px 6px; border-radius: 4px; background: #262b33; color: var(--muted); }
+  .chip.ok { background: #1d3a25; color: #7fe39a; }
+  .chip.warn { background: #3d3119; color: #f0c56e; }
+  .chip.bad { background: #3b2222; color: #f08f8f; }
+  aside { border-left: 1px solid var(--line); background: var(--panel); overflow-y: auto; padding: 20px; }
+  aside img { width: 100%; border-radius: 10px; }
+  aside h2 { margin: 14px 0 2px; font-size: 18px; }
+  aside .pub { color: var(--muted); margin-bottom: 14px; }
+  aside dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; font-size: 13px; margin: 0 0 16px; }
+  aside dt { color: var(--muted); }
+  aside dd { margin: 0; word-break: break-all; }
+  .status { padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 14px; }
+  .status.ok { background: #1d3a25; } .status.warn { background: #3d3119; } .status.bad { background: #3b2222; }
+  pre { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px;
+        font-size: 11.5px; white-space: pre-wrap; word-break: break-all; margin: 0 0 8px; }
+  .btn { all: unset; cursor: pointer; background: var(--accent); color: #08130b; font-weight: 600;
+         padding: 8px 14px; border-radius: 7px; font-size: 13px; }
+  .btn:disabled { opacity: .4; cursor: default; }
+  .empty { grid-column: 1/-1; color: var(--muted); text-align: center; padding: 60px 20px; }
+  .empty.err { color: #f08f8f; }
+  .spin { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--line);
+          border-top-color: var(--accent); border-radius: 50%; animation: s .7s linear infinite; vertical-align: -2px; }
+  @keyframes s { to { transform: rotate(360deg); } }
+  .badge { background: var(--accent); color: #08130b; font-size: 11px; font-weight: 700; border-radius: 9px;
+           padding: 0 6px; margin-left: 6px; }
+  .btn.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); font-weight: 500; padding: 6px 11px; }
+  .btn.ghost:hover:not(:disabled) { border-color: var(--muted); }
+  .btn.wide { display: block; text-align: center; margin-bottom: 8px; }
+  .link { color: var(--muted); font-size: 12px; cursor: pointer; text-decoration: underline; }
+  .link:hover { color: var(--text); }
+  .note { color: var(--muted); font-size: 12px; margin: 6px 0 10px; }
+  #dl { overflow-y: auto; padding: 20px; }
+  #dl h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin: 6px 0 10px; }
+  #dl section { margin-bottom: 26px; }
+  .row { display: grid; grid-template-columns: 54px 1fr auto; gap: 14px; align-items: center; background: var(--card);
+         border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
+  .row .thumb { width: 54px; aspect-ratio: 2/3; border-radius: 6px; background: #222 center/cover no-repeat; }
+  .row .t { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .sub { color: var(--muted); font-size: 12px; margin-top: 2px; word-break: break-all; }
+  .row .sub.bad { color: #f08f8f; white-space: pre-wrap; max-height: 5.6em; overflow-y: auto; }
+  .row .acts { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  .bar { height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; margin: 7px 0 4px; }
+  .bar i { display: block; height: 100%; background: var(--accent); transition: width .4s; }
+  .nums { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .msg { color: #f08f8f; font-size: 12px; margin-top: 6px; }
+</style>
+</head>
+<body>
+<nav>
+  <h1>X<span>odus</span></h1>
+  <button data-view="library" class="active">My library</button>
+  <button data-view="gamepass">Game Pass PC</button>
+  <button data-view="store">Search store</button>
+  <button data-view="downloads">Downloads<span class="badge" id="badge" hidden></span></button>
+  <div class="user" id="user"></div>
+</nav>
+<main>
+  <header>
+    <input type="search" id="q" placeholder="Filter…" autofocus>
+    <label><input type="checkbox" id="onlyOk"> Supported only</label>
+    <span class="count" id="count"></span>
+  </header>
+  <div class="content" id="content">
+    <section id="grid"></section>
+    <div id="dl" hidden></div>
+    <aside id="detail" hidden></aside>
+  </div>
+</main>
+<script>
+const rpc = (() => {
+  let next = 1; const pending = new Map();
+  window.xodus = { reply(r) { const p = pending.get(r.id); if (!p) return; pending.delete(r.id);
+                              r.ok ? p.resolve(r.data) : p.reject(new Error(r.error)); } };
+  return (cmd, arg = "") => new Promise((resolve, reject) => {
+    const id = next++; pending.set(id, { resolve, reject });
+    window.ipc.postMessage(JSON.stringify({ id, cmd, arg }));
+  });
+})();
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const gb = b => b ? (b / 1e9).toFixed(1) + " GB" : "?";
+const STATUS = {
+  supported:   ["ok",   "Supported",    "MSIXVC: Xodus can download and decrypt it."],
+  unsupported: ["warn", "MSIXVC2",      "Newer format, not supported by Xodus yet (#53 / PR #219)."],
+  not_gdk:     ["bad",  "No GDK",       "Not a GDK package; Xodus does not apply."],
+};
+const ACQ = { purchased: "Purchased", gamepass: "Game Pass", other: "Other" };
+
+const state = { view: "library", cache: {}, items: [], selected: null, cli: "xodus-cli", searchSeq: 0,
+                dl: { jobs: [], installed: [] }, dlError: null, actionError: null };
+
+function chipsFor(g) {
+  const out = [];
+  if (g.acquisition) out.push(`<span class="chip">${esc(ACQ[g.acquisition] || g.acquisition)}</span>`);
+  if (g.pc) { const [cls, label] = STATUS[g.pc.xodus]; out.push(`<span class="chip ${cls}">${label}</span>`); }
+  else out.push(`<span class="chip bad">No PC</span>`);
+  return out.join("");
+}
+
+function render() {
+  const q = $("#q").value.trim().toLowerCase();
+  const onlyOk = $("#onlyOk").checked;
+  let list = state.items;
+  if (state.view !== "store" && q) list = list.filter(g => (g.title + " " + (g.publisher || "")).toLowerCase().includes(q));
+  if (onlyOk) list = list.filter(g => g.pc?.xodus === "supported");
+  $("#count").textContent = state.items.length ? `${list.length} games` : "";
+  if (!list.length) { $("#grid").innerHTML = `<div class="empty">Nothing here.</div>`; return; }
+  $("#grid").innerHTML = list.map(g => `
+    <div class="card ${state.selected?.product_id === g.product_id ? "selected" : ""}" data-id="${esc(g.product_id)}">
+      <div class="poster" style="background-image:url('${esc(g.image || "")}')"></div>
+      <div class="meta"><div class="t" title="${esc(g.title)}">${esc(g.title)}</div><div class="chips">${chipsFor(g)}</div></div>
+    </div>`).join("");
+}
+
+function showDetail(g) {
+  if (state.selected?.product_id !== g.product_id) state.actionError = null;
+  state.selected = g;
+  const d = $("#detail"); d.hidden = false; $("#content").classList.add("with-detail");
+  const st = g.pc ? STATUS[g.pc.xodus] : ["bad", "No PC", "No Windows package."];
+  d.innerHTML = `
+    ${g.image ? `<img src="${esc(g.image.replace("?w=300", "?w=600"))}">` : ""}
+    <h2>${esc(g.title)}</h2><div class="pub">${esc(g.publisher || "")}</div>
+    <div class="status ${st[0]}"><b>${st[1]}</b> — ${st[2]}</div>
+    <dl>
+      <dt>Product ID</dt><dd>${esc(g.product_id)}</dd>
+      ${g.acquisition ? `<dt>Source</dt><dd>${esc(ACQ[g.acquisition] || g.acquisition)}</dd>` : ""}
+      ${g.pc ? `<dt>Format</dt><dd>${esc(g.pc.format)}</dd><dt>Size</dt><dd>${gb(g.pc.size_bytes)}</dd>
+               <dt>Content ID</dt><dd>${esc(g.pc.content_id || "?")}</dd>` : ""}
+    </dl>
+    ${g.pc?.xodus === "supported" ? `<div id="action">${actionHtml(g)}</div>
+      <span class="link" id="copy">Copy download command</span>` : ""}`;
+  $("#copy")?.addEventListener("click", e => {
+    const folder = "~/Games/xodus/" + g.title.replace(/[^A-Za-z0-9]+/g, "");
+    copyText(`mkdir -p ${folder} && caffeinate -i "${state.cli}" streaming ${g.product_id} ${folder}`);
+    e.target.textContent = "Copied ✓"; setTimeout(() => e.target.textContent = "Copy download command", 1500);
+  });
+  render();
+}
+
+function copyText(text) {
+  const t = document.createElement("textarea"); t.value = text; t.style.position = "fixed"; t.style.opacity = "0";
+  document.body.appendChild(t); t.select(); document.execCommand("copy"); t.remove();
+}
+
+// ---- Downloads ----
+const pct = p => p.total ? Math.min(100, Math.floor(p.done * 100 / p.total)) : 0;
+const speedFmt = b => b > 0 ? (b / 1e6).toFixed(1) + " MB/s" : "";
+const etaFmt = s => s == null ? "" : s >= 3600 ? `${Math.floor(s / 3600)}h ${String(Math.floor(s % 3600 / 60)).padStart(2, "0")}m left`
+                  : s >= 60 ? `${Math.round(s / 60)} min left` : `${s} s left`;
+const JOB = { queued: "Queued", downloading: "Downloading", done: "Completed", failed: "Failed",
+              cancelled: "Cancelled", interrupted: "Interrupted (the app was closed)" };
+const RESTARTABLE = ["failed", "cancelled", "interrupted"];
+const NO_RESUME = "Downloads cannot resume: restarting begins again from zero.";
+
+const jobFor = id => state.dl.jobs.find(j => j.product_id === id);
+const installedFor = id => state.dl.installed.find(i => i.product_id === id);
+const activeCount = () => state.dl.jobs.filter(j => j.state === "queued" || j.state === "downloading").length;
+
+function actionHtml(g) {
+  const j = jobFor(g.product_id), inst = installedFor(g.product_id);
+  const msg = state.actionError ? `<div class="msg">${esc(state.actionError)}</div>` : "";
+  if (j?.state === "downloading")
+    return `<button class="btn wide" disabled>Downloading ${pct(j.progress)}%</button>
+            <button class="btn ghost wide" data-act="cancel" data-id="${esc(g.product_id)}">Cancel</button>${msg}`;
+  if (j?.state === "queued")
+    return `<button class="btn wide" disabled>Queued</button>
+            <button class="btn ghost wide" data-act="cancel" data-id="${esc(g.product_id)}">Cancel</button>${msg}`;
+  if (inst)
+    return `<button class="btn wide" disabled>Installed</button>
+            <button class="btn ghost wide" data-act="reveal" data-path="${esc(inst.path)}">Show in Finder</button>${msg}`;
+  if (j && RESTARTABLE.includes(j.state))
+    return `<button class="btn wide" data-act="start" data-id="${esc(g.product_id)}">Restart download</button>
+            <div class="note">Last attempt: ${esc(JOB[j.state])}. ${NO_RESUME}</div>${msg}`;
+  return `<button class="btn wide" data-act="start" data-id="${esc(g.product_id)}">Download</button>
+          <div class="note">Saved to ~/Games/xodus/${esc(g.title.replace(/[^A-Za-z0-9]+/g, ""))}</div>${msg}`;
+}
+
+function jobRow(j) {
+  const p = j.progress || {};
+  const running = j.state === "downloading";
+  const sub = j.state === "failed" && j.error ? `<div class="sub bad">${esc(j.error)}</div>`
+            : `<div class="sub">${esc(running ? (p.status || "Downloading") : JOB[j.state])}${RESTARTABLE.includes(j.state) ? " · " + NO_RESUME : ""}</div>`;
+  const nums = p.total ? [`${gb(p.done)} / ${gb(p.total)}`, running && speedFmt(p.speed), running && etaFmt(p.eta_secs)].filter(Boolean).join(" · ") : "";
+  const acts = [];
+  if (j.state === "queued" || running) acts.push(`<button class="btn ghost" data-act="cancel" data-id="${esc(j.product_id)}">Cancel</button>`);
+  if (RESTARTABLE.includes(j.state)) acts.push(`<button class="btn ghost" data-act="start" data-id="${esc(j.product_id)}">Restart</button>`);
+  if (j.state !== "queued") acts.push(`<button class="btn ghost" data-act="reveal" data-path="${esc(j.dest)}">Show in Finder</button>`);
+  if (j.state !== "queued" && !running) acts.push(`<button class="btn ghost" data-act="remove" data-id="${esc(j.product_id)}">Remove</button>`);
+  return `<div class="row">
+    <div class="thumb" style="background-image:url('${esc(j.image || "")}')"></div>
+    <div><div class="t">${esc(j.title)}</div>${sub}
+      ${running || (p.total && j.state !== "done") ? `<div class="bar"><i style="width:${pct(p)}%"></i></div>` : ""}
+      <div class="nums">${running ? pct(p) + "% · " : ""}${nums}</div></div>
+    <div class="acts">${acts.join("")}</div></div>`;
+}
+
+function installedRow(i) {
+  return `<div class="row">
+    <div class="thumb" style="background-image:url('${esc(i.image || "")}')"></div>
+    <div><div class="t">${esc(i.title)}</div><div class="sub">${esc(i.path)}</div><div class="nums">${gb(i.size_bytes)} on disk</div></div>
+    <div class="acts">
+      <button class="btn" data-act="launch" data-id="${esc(i.product_id || "")}" disabled title="Launching is not available yet">Play (coming soon)</button>
+      <button class="btn ghost" data-act="reveal" data-path="${esc(i.path)}">Show in Finder</button></div></div>`;
+}
+
+const RANK = { downloading: 0, queued: 1 };
+function renderDownloads() {
+  const jobs = [...state.dl.jobs].sort((a, b) => (RANK[a.state] ?? 2) - (RANK[b.state] ?? 2)
+                                              || (b.finished_at || 0) - (a.finished_at || 0));
+  $("#count").textContent = "";
+  $("#dl").innerHTML = `
+    ${state.dlError ? `<div class="msg">${esc(state.dlError)}</div>` : ""}
+    <section><h3>Installed</h3>${state.dl.installed.length ? state.dl.installed.map(installedRow).join("")
+      : `<div class="note">No games in ~/Games/xodus yet.</div>`}</section>
+    <section><h3>Downloads</h3>${jobs.length ? jobs.map(jobRow).join("")
+      : `<div class="note">No downloads. Pick a supported game and press Download.</div>`}</section>`;
+}
+
+async function refreshDownloads() {
+  try { state.dl = await rpc("downloads"); state.dlError = null; }
+  catch (e) { state.dlError = e.message; }
+  const n = activeCount();
+  $("#badge").hidden = !n; $("#badge").textContent = n;
+  if (state.view === "downloads") renderDownloads();
+  if (state.selected && $("#action")) $("#action").innerHTML = actionHtml(state.selected);
+}
+
+async function act(el) {
+  const { act, id, path } = el.dataset;
+  const g = state.selected?.product_id === id ? state.selected : null;
+  const j = jobFor(id);
+  state.actionError = null;
+  try {
+    if (act === "start") {
+      const src = g || j;
+      await rpc("download_start", JSON.stringify({ product_id: id, title: src.title, image: src.image || null }));
+    } else if (act === "cancel") await rpc("download_cancel", id);
+    else if (act === "remove") await rpc("download_remove", id);
+    else if (act === "reveal") await rpc("reveal", path);
+    else if (act === "launch") await rpc("launch", id);
+  } catch (e) {
+    if (state.view === "downloads") state.dlError = e.message; else state.actionError = e.message;
+  }
+  await refreshDownloads();
+}
+document.addEventListener("click", e => { const b = e.target.closest("[data-act]"); if (b && !b.disabled) act(b); });
+setInterval(() => { if (state.view === "downloads" || activeCount()) refreshDownloads(); }, 1000);
+
+async function load(view) {
+  state.view = view; state.selected = null; state.items = []; state.actionError = null;
+  $("#detail").hidden = true; $("#content").classList.remove("with-detail");
+  document.querySelectorAll("nav button").forEach(b => b.classList.toggle("active", b.dataset.view === view));
+  const dl = view === "downloads";
+  $("#dl").hidden = !dl; $("#grid").hidden = dl;
+  document.querySelectorAll("header > *:not(.count)").forEach(el => el.hidden = dl);
+  if (dl) { state.dlError = null; renderDownloads(); refreshDownloads(); return; }
+  $("#q").value = ""; $("#q").placeholder = view === "store" ? "Search the Microsoft Store…" : "Filter…";
+  if (view === "store") { $("#grid").innerHTML = `<div class="empty">Type to search.</div>`; render(); return; }
+  if (state.cache[view]) { state.items = state.cache[view]; render(); return; }
+  $("#grid").innerHTML = `<div class="empty"><span class="spin"></span> Loading…</div>`; $("#count").textContent = "";
+  try {
+    const items = await rpc(view);
+    state.cache[view] = items;
+    if (state.view === view) { state.items = items; render(); }
+  } catch (e) {
+    if (state.view === view) $("#grid").innerHTML = `<div class="empty err">${esc(e.message)}</div>`;
+  }
+}
+
+let debounce;
+$("#q").addEventListener("input", () => {
+  if (state.view !== "store") return render();
+  clearTimeout(debounce);
+  const q = $("#q").value.trim();
+  if (!q) { state.items = []; $("#grid").innerHTML = `<div class="empty">Type to search.</div>`; return; }
+  debounce = setTimeout(async () => {
+    const seq = ++state.searchSeq;
+    $("#grid").innerHTML = `<div class="empty"><span class="spin"></span> Searching…</div>`;
+    try {
+      const items = await rpc("search", q);
+      if (seq === state.searchSeq && state.view === "store") { state.items = items; render(); }
+    } catch (e) { if (seq === state.searchSeq) $("#grid").innerHTML = `<div class="empty err">${esc(e.message)}</div>`; }
+  }, 300);
+});
+$("#onlyOk").addEventListener("change", render);
+$("#grid").addEventListener("click", e => {
+  const card = e.target.closest(".card"); if (!card) return;
+  const g = state.items.find(x => x.product_id === card.dataset.id); if (g) showDetail(g);
+});
+document.querySelectorAll("nav button").forEach(b => b.addEventListener("click", () => load(b.dataset.view)));
+
+rpc("status").then(s => { state.cli = s.cli; $("#user").textContent = s.user ? "Signed in: " + s.user : "Not signed in — run xodus-cli login"; })
+            .catch(() => {});
+load("library");
+refreshDownloads();
+</script>
+</body>
+</html>
